@@ -1,0 +1,110 @@
+---
+title: "CSSS 594, Homework 1"
+author: "Neal Marquez"
+date: "Due: October 10, 2017"
+output:
+    html_document:
+    theme: cosmo
+highlight: haddock
+---
+
+# Question 1: 
+
+Suppose you are interested in studying the effects of physical disability on
+depression. Over the last 5 years, you have collected data on adults ages 18 to
+55 who have become physically disabled at some point during that time, based on 
+a registry of diagnosed patients at a hospital. You were able to interview each
+individual soon after their disability was diagnosed (during the first month) &
+follow-up two times, between 6 and 8 months and between 12 and 16 months after
+the diagnosis. The same procedure was conducted with a control group of the same
+sample size. Each time, depression was assessed using a standardized scale.
+
+ a. What is the outcome? How is it measured?
+ b. What is the time metric? Where is zero? How many measurement occasions
+    per individual? Time-structured or -unstructured schedule?
+ c. Would an analysis that used the described data to address the research 
+    question, about the association between disability and depression, be 
+    considered a longitudinal data analysis? Why or why not?
+    
+## Part a
+
+The outcome that was assessed was depression, which was measured using a 
+standardized scale.
+
+## Part b
+
+The time schedule is sessions after disability diagnosis. Time point zero is the
+session that occurs within the first monthe of diagnosis. There are a total of
+three time points of data collected per individual. This apperas to be a time
+structured data collection process although there seems to be a level of
+flexibility within the three time periods for which data is collected.
+
+## Part c
+
+This analysis could be seen as a logitudinal data analysis because we have
+repeated measures of the same individuals over time and can look at person level
+differences as well as group level differences.
+
+
+# Question 2.
+
+From Singer and Willett (2003), Section 1.1.3:
+
+''Many psychiatrists find that short-term anxiety-provoking psychotherapy (STAPP) can ameliorate psychological distress. A methodological strength of the associated literature is its consistent use of a well-developed instrument: the __Symptom Check-List__<sup>a<sub>1</sub></sup> (SCL-90), developed by __Derogatis (1994)__<sup>a<sub>2</sub></sup>. A methodological weakness is its reliance on two-wave designs: one wave of data pre-treatment and a second wave post-treatment. Researchers conclude that the treatment is effective when the decrease in SCL-90 scores among STAPP patients is lower than the decrease among individuals in a comparison group.
+
+Svartberg, Seltzer, Stiles and Khoo (1995) adopted a different approach to studying STAPP's efficacy. Instead of collecting just two waves of data, the researchers examined ``the course, rate and correlates of symptom improvement as measured with the SCL-90 during and after STAPP'' (p. 242). A sample of 15 patients received approximately 20 weekly STAPP sessions. During the study, each patient completed the SCL-90 up to __seven times__<sup>b<sub>1</sub></sup>: __once or twice at referral (before therapy began)__,<sup>b<sub>2</sub></sup> __once at mid-therapy, once at termination and three times after therapy ended (after 6, 12 and 24 months)__<sup>b<sub>3</sub></sup>. Suspecting that STAPP's effectiveness would vary with the patients' abilities to control their emotional and motivational impulses (known as \emph{ego rigidity}), two independent psychiatrists reviewed the patients' intake files and assigned  __ego rigidity ratings__<sup>b<sub>4</sub></sup>.''
+
+# Question 3
+## Part a
+
+```{r}
+data <- read.csv("./tolerance1_pp.csv")
+```
+
+## Part b
+
+```{r}
+summary(data)
+```
+
+## Part c
+
+```{r}
+library(ggplot2)
+data$Male <- as.factor(data$male)
+ggplot(data, aes(x=exposure, y=tolerance, shape=Male)) + 
+    geom_point()
+```
+
+## Part d
+
+```{r}
+maledata <- subset(data, male == 1)
+femaledata <- subset(data, male == 0)
+```
+
+## Part e
+
+```{r}
+malemintime <- min(maledata$time)
+malerangetol <- round(range(maledata$tolerance) ,2)
+femalemintime <- min(femaledata$time)
+femalerangetol <- round(range(femaledata$tolerance) ,2)
+```
+
+For males, the minimum value of time is `r malemintime`. The range of tolerance is (`r malerangetol`).
+
+For females, the minimum value of time is `r femalemintime`. The range of tolerance is (`r femalerangetol`).
+
+## Part f
+
+```{r}
+lm1 <- lm(tolerance ~ time + male + exposure, data=data)
+```
+
+## Part g
+
+```{r}
+library(pander)
+pander(summary(lm1))
+```
