@@ -1,0 +1,72 @@
+---
+title: "CSSS 594, Quiz 1"
+author: "Neal Marquez"
+date: "October 4, 2017"
+output:
+    html_document:
+    theme: cosmo
+highlight: haddock
+---
+
+# Instructions
+
+Submit your solutions both as this `.Rmd` file and the resulting `.html` file to Canvas, on the Quiz 1 page. If you can't get it to knit because your code won't work and you can't fix it in time (that happens!), you can comment out the part of the code that doesn't work, make a note in the `.Rmd` script, and then knit. 
+    
+# Question 1: `dplyr` practice
+
+With the `milk_long` dataset, produce a dataset `milk_long_quiz` that has:
+
+* only the cows on the barley-only diet,
+* only the first 3 weeks of each cow's data, and
+* only the columns `Cow`, `Week`, and `Protein`, sorted first by cow ID and then in descending order of week.
+
+Print out the first six rows of `milk_long_quiz` using the `head` command.
+
+```{r question1}
+library(dplyr)
+# IMPORTANT: change directories to your own computer!
+milk_long <- read.table("~/Documents/logdata/week2/milk_long.csv",
+                       header=TRUE,
+                       sep=",")
+# YOUR R CODE TO DO THE ABOVE GOES HERE
+milk_long_quiz <- milk_long %>%
+    filter(Diet == "Barley" & Week <= 3) %>%
+    select(Cow, Week, Protein) %>%
+    arrange( Cow, desc(Week) )
+
+head(milk_long_quiz, 6)
+```
+
+# Question 2: summarizing data
+
+Using `milk_long`, sum the protein levels for each cow, for the first 3 weeks they were in the study. Then calculate the range across those 3-week sums, for all cows within each diet group. Print out a table of ranges for the three diet groups, formatted with `pander`.
+
+```{r question2, warning=FALSE, message=FALSE}
+# install.packages("pander") # Run if you need!
+library(pander)
+# YOUR R CODE TO DO THE ABOVE GOES HERE
+
+diet_cow_sum <- milk_long %>%
+    filter(Week <= 3) %>%
+    group_by(Cow, Diet) %>%
+    summarize(total_protein=sum(Protein))
+
+range_by_diet <- diet_cow_sum %>%
+        group_by(Diet) %>%
+        summarize(min_protien_sum=min(total_protein),
+                  max_protein_sum=max(total_protein))
+
+pander(range_by_diet)
+```
+
+# Question 3: plotting data
+
+With your `milk_long_quiz` dataset, make spaghetti plots of the cows' Protein (lines only, no points) for **just the first 3 weeks of the study**.  Week will be on the $x$-axis and Protein will be on the $y$-axis, with a line for each cow. Color the lines by the diet (default choices are fine) and split the plot into three panels *horizontally*, one for each diet. Give your plot this title: "First 3 week protein levels observed, by diet".
+
+```{r question3, warning=FALSE, message=FALSE}
+library(ggplot2)
+# YOUR R CODE TO DO THE ABOVE GOES HERE
+ggplot(subset(milk_long, Week <= 3), aes(x=Week, y=Protein, 
+                                         color=Diet, group=Cow)) +
+    geom_line() + facet_grid(.~Diet) + labs(title="First 3 week protein levels observed, by diet")
+```

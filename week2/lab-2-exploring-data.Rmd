@@ -1,0 +1,259 @@
+---
+title: "Exploring longitudinal data"
+subtitle: "CSSS 594, Lab 2"
+author: "Max Schneider"
+date: "October 4, 2017"
+output:
+    html_document:
+        toc: true
+        theme: cosmo
+        highlight: haddock
+        number_sections: true
+---
+
+# About this lab (and quiz)
+
+We will go through the lab activities for 30 minutes and then you will take Quiz 1 (20 minutes). By 2:20pm, please knit your `quiz-1.Rmd` file and follow instructions on submission to Canvas. 
+
+We will explore a dataset from a study conducted in Australia on the relationship between diet and milk production in cows described in *Analysis of Longitudinal Data* by Diggle, Heagerty, Liang, and Zeger, Example 1.4. You can download `milk_long.csv` from Canvas or access on the CSSCR lab computers at `P:/Courses/csss594/milk_long.csv`:
+
+For each cow in the study, this contains the cow's ID number, the diet they were fed (barley, lupins, or a mixture), and the protein content of their milk samples taken each week. Time is measured in weeks since giving birth to a calf. The objective is to study how diet affects milk protein production over time.
+
+```{r importData}
+# change directories to where this file sits on your own computer!
+milk_long <- read.table("~/Documents/logdata/week2/milk_long.csv",
+                        header=TRUE, 
+                        sep=",")
+head(milk_long)
+str(milk_long)
+```
+
+# `dplyr` for manipulating data
+
+`dplyr` is an R package for manipulating data frames. It makes use of a special operator called a "pipe" (`%>%`) which means "take the object on the left and do the command on the right to it". `dplyr` speeds up common operations, especially in data processing on particular variables in a dataset. For example, with piping, you don't need to keep retyping the name of a data frame when referencing its columns. We also get a bunch of useful commands for common data processing tasks.
+
+```{r dplyrSimpleDemo, warning=FALSE, message=FALSE}
+# install.packages("dplyr")
+library(dplyr)
+
+milk_long_modified <- milk_long %>%
+    # make new variable: a flag for cows with an even ID number (i.e. ID mod 2 is 0 and %% is the mod operator)
+    mutate( is_even = ifelse(Cow %% 2 == 0, 1, 0) )
+head(milk_long_modified)
+str(milk_long_modified)
+```
+
+Compare this with the equivalent base R way of making the flag for even-numbered IDs:
+
+```{r baseSimpleDemo, warning=FALSE, message=FALSE}
+# copy milk_long to a new data frame
+milk_long_modified2 <- milk_long
+# make flag for cows with an even ID number (i.e. ID mod 2 is 0, %% is the mod operator)
+milk_long_modified2$is_even <- ifelse(milk_long_modified2$Cow %% 2 == 0, 1, 0)
+head(milk_long_modified2)
+str(milk_long_modified2)
+
+```
+Both methods work and give the same results, so you can do whichever makes more sense to you. The `dplyr` way will be more computationally efficient, more legible and more flexible.
+
+Important data processing functions include:
+
+* `mutate`: add columns (e.g. calculate something new based on other columns, row-wise), or modify existing columns.
+* `filter`: subset rows based on logical conditions You can combine filtering criteria using "ands" with `&` or "ors" with `|`.
+* `select`: choose columns to keep, or name columns to drop (using a `-` sign in front of the column name).
+* `arrange`: sort the data by the first column named, then the second, etc. The default order is ascending. Use `desc()` around a variable name to use descending order.
+
+Piped commands can be chained so that you can do a sequence of things to your dataset at once:
+```{r dplyrChainDemo}
+
+milk_long_subset <- milk_long %>%
+  # make a dataset that's just even cow ID #s for week 1,
+  # who are NOT having the barley only diet;
+  mutate( is_even = ifelse(Cow %% 2 ==0, 1, 0) ) %>%
+  filter( is_even==1 & Week==1 & Diet != "Barley") %>%
+  # keep only the Diet, Cow, and Protein columns...
+  select( Diet, Cow, Protein ) %>%
+  # ...and sort by Protein in descending order.
+  arrange( desc(Protein) )
+head(milk_long_subset)
+str(milk_long_subset)
+```
+
+# Summarizing data
+
+`dplyr` is great for getting summaries of our data when it's in "long" format; that is, when every row corresponds to one observation for one subject/unit. We use the `group_by` command to say which variables constitute a group, i.e. the level at which we want to summarize the data. We then use the `summarize` command to do the computations. Examples of functions we can use with `summarize`:
+
+* `n`: counts the number of observations within a group, does not take any arguments
+* `n_distinct`: counts number of distinct values for a variable within a group (equivalent to `length(unique(x))`)
+* `mean`, `min`, `max`, `sum`, `median`, `sd`, `var`, etc.: applies these functions to rows within each group (for the variable that's in the argument)
+* or a function that we create ourselves!
+
+We can combine these to, say, find the number of weeks each cow was observed (number of rows per cow), and then compute the minimum and maximum weeks observed within each diet:
+
+```{r groupByDemo}
+cow_diet_weeks <- milk_long %>%
+    # first, at level of cow and diet, how many rows are in data?
+    group_by(Diet, Cow) %>%
+    summarize(n_weeks=n()) %>%
+    # then, at level of diet, how many cows and min and max weeks observed?
+    group_by(Diet) %>%
+    summarize(n_cows=n_distinct(Cow),
+              min_weeks=min(n_weeks),
+              max_weeks=max(n_weeks))
+cow_diet_weeks
+
+# store specific numbers to report inline for cows on the mixed diet
+# use as.numeric to convert to a single number instead of a 1x1 data frame
+n_mixed <- cow_diet_weeks %>%
+    filter(Diet=="Mixed") %>%
+    select(n_cows) %>%
+    as.numeric()
+
+min_mixed <- cow_diet_weeks %>%
+    filter(Diet=="Mixed") %>%
+    select(min_weeks) %>%
+    as.numeric()
+
+max_mixed <- cow_diet_weeks %>%
+    filter(Diet=="Mixed") %>%
+    select(max_weeks) %>%
+    as.numeric()
+```
+
+Using R Markdown, we can report specific numbers inline for discussion, e.g.: *for the*
+```{r eval=FALSE}
+$n=$ `r n_mixed`
+```
+*cows in the group fed a mixed diet, the number of weeks observed ranges from* 
+```{r eval=FALSE}
+`r min_mixed`
+```
+*to* 
+```{r eval=FALSE}
+`r max_mixed`
+```
+*weeks.*
+
+That produces: *for the $n=$ `r n_mixed` cows in the group fed a mixed diet, the number of weeks observed ranges from `r min_mixed` to `r max_mixed`.*
+
+**Let's try this together.** How should we write a complete sentence in R Markdown that knits R commands for the range in the number of weeks for the Barley diet group?
+
+```{r}
+barley_range <- cow_diet_weeks %>%
+    mutate(range=max_weeks - min_weeks) %>%
+    filter(Diet=="Barley") %>%
+    select(range) %>%
+    as.numeric()
+```
+
+The range of the barley feed group is `r barley_range`.
+
+A handy reference sheet for `dplyr` commands can be found at <https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf>.
+
+# `ggplot2` for longitudinal data
+
+`ggplot2` is a graphics package that produces nice-looking plots of longitudinal and non-longitudinal data. It uses a "grammar of graphics" where aspects of your data that determine plotting are defined as the "aesthetics" of the graph (e.g. $x$ and $y$ values, changing color or size based on certain variables, variables that define groups of related points), and elements being plotted/printed (e.g. points, lines, axis labels, the title, legends, splitting the data into subplots) are "layers" you combine in the graph.
+
+In addition to this lab, a good reference for plotting longitudinal data in `ggplot2` is at <http://www.ats.ucla.edu/stat/r/faq/longitudinal.htm>. For general `ggplot2` help, the *Cookbook for R* website is a great resource with many examples: <http://www.cookbook-r.com/Graphs/index.html>. I have a copy of this book if you want to borrow it.
+
+## Empirical growth plots
+
+One way of visualizing longitudinal information is with empirical growth plots, which are sometimes called a "spaghetti" plot: one piecewise line for each unit in the study connecting the observed values, where the time dimension is on the $x$-axis and the outcome is on the $y$-axis. The lines can be colored or use different styles to denote different important covariates, e.g. gender, race, or treatment. In the `milk_long` case, the units are cows and the covariate of interest is diet.
+
+```{r milkNoFacet, warning=FALSE, message=FALSE}
+library(ggplot2)
+ggplot(data=milk_long,
+       aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    geom_point() +
+    geom_line() +
+    ggtitle("Protein levels in milk by week for each cow")
+```
+
+## `ggplot2` syntax
+
+In this example, we are using:
+
+* Aesthetics (`aes`):
+    - `x`: $x$-axis, our time variable
+    - `y`: $y$-axis, our outcome variable
+    - `group`: our unit variable
+    - `color`: variable we want to use to segment by color
+* Layers (separated by `+`), each of which can take arguments:
+    - `ggplot`: base layer containing information about the data and overall aesthetics
+    - `geom_point`: scatterplot points at $x$ and $y$ values
+    - `geom_line`: line connecting values within each group
+    - `ggtitle`: title for the plot. `xlab` and `ylab` work similarly for labeling the axes if our variable names are not descriptive enough.
+
+Additional aesthetics we can use are `shape` (symbols used for points), `linetype`, `size` (dot size/line thickness), `alpha` (transparency level, 0 for fully transparent and 1 for fully opaque), and `fill` (color for areas like bar charts).
+
+We can change the general appearance of parts of the graph that aren't related to specific variables (e.g. use large sized symbols for the `geom_point` layer). These are passed as non-aesthetic options to the layers; that is, in the specific layer and not enclosed in an `aes()` group in the `ggplot()` main layer.
+
+If we just wanted the points and not the lines, but with different shapes for each diet, and we wanted them to all be large (`size=4`) and transparent (`alpha=0.5`):
+```{r milkScatterOnly, warning=FALSE, message=FALSE}
+ggplot(data=milk_long,
+       aes(x=Week, y=Protein, shape=Diet)) +
+    geom_point(size=4, alpha=0.5) +
+    ggtitle("Protein levels in milk by week, all cows")
+```
+
+Comment: this is not an effective visualization of this longitudinal data.
+
+We have tons of options with `ggplot2`. We can get rid of the points (no `geom_point`), get rid of the gray background (add `theme_bw` layer), and change the colors used (set `scale_color_manual` values).
+
+```{r milkNoFacetRev, warning=FALSE, message=FALSE}
+# storing the graph to an object -- I can add more layers later!
+milk_graph <- ggplot(data=milk_long,
+                     aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    geom_line(alpha=0.5) +
+    ggtitle("Protein levels in milk by week for each cow") +
+    theme_bw() +
+    scale_color_manual(values=c("mediumorchid4", "darkgoldenrod1", "deepskyblue"))
+
+milk_graph
+```
+
+For more information on modifying colors, legends, etc., see <http://www.cookbook-r.com/Graphs/index.html>. For specific R color names, see <http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf>. Shapes and linetypes can be modified in a similar way, with more information at <http://www.cookbook-r.com/Graphs/Shapes_and_line_types>.
+
+## Facets
+
+With lots of subjects, these plots are hard to read no matter what colors we use, so we can use "facets" to segment by diet:
+
+```{r milkFacetDiet, warning=FALSE, message=FALSE}
+milk_graph +
+    facet_grid(. ~ Diet)
+```
+
+To switch to a 3 by 1 layout instead of a 1 by 3, change to `facet_grid( Diet ~ .)` instead. Give this a shot. Which layout do you think is more effective?
+
+If we had two variables to facet by (such as diet and species), we can make a matrix of plots. The value on the left of the `~` denotes how we split down facet rows, and the one on the right of the `~` denotes how we split across facet columns.
+
+We can even facet down to the individual cow to get a panel for each of them, using `facet_wrap` instead of `facet_grid`:
+
+```{r milkFacetCow, warning=FALSE, message=FALSE, fig.height=8, fig.width=10}
+milk_graph +
+    # will make a graph for each cow wrapping across columns
+    facet_wrap( ~ Cow, ncol=10)
+```
+
+There are a lot of cows, though, so it's hard to see and slow to render. We can sample some at random:
+```{r milkFacetDietRandom, warning=FALSE, message=FALSE}
+# setting a seed in R makes your "random" number generation reproducible
+set.seed(10715)
+# sample 20 cow IDs without replacement from the set of cow IDs
+sampled_cows <- sample(unique(milk_long$Cow), size=20, replace=FALSE)
+sampled_cows
+
+# apply filtering to the data to keep the cows appearing in sampled_cows
+# note use of the %in% operator
+ggplot(data=milk_long %>%
+           filter(Cow %in% sampled_cows),
+       aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    geom_line(alpha=0.5) +
+    ggtitle("Protein levels in milk by week for sampled cow") +
+    theme_bw() +
+    scale_color_manual(values=c("mediumorchid4", "darkgoldenrod1", "deepskyblue")) +
+    # 5 row, 4 column layout
+    facet_wrap( ~ Cow, ncol=4)
+```
+
+With facets, the axes are automatically set to the same scale, unless you add the option `scales="free"` to the `facet_grid` or `facet_wrap` layer. For more on facets, see <http://www.cookbook-r.com/Graphs/Facets_(ggplot2)>.

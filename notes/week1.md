@@ -11,4 +11,4 @@
  - Run a simple regression $y = \alpha + \Beta X$  
  - Each individual should be fit seperately  
  - Explore the fitted values of the parameters  
- - 
+
