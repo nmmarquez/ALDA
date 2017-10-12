@@ -1,0 +1,366 @@
+---
+title: "Visualizing longitudinal data and level-1 regression"
+subtitle: "CSSS 594, Lab 3"
+author: "Max Schneider"
+date: "October 11, 2017"
+output:
+    html_document:
+        toc: true
+        theme: cosmo
+        highlight: haddock
+        number_sections: true
+---
+
+# `ggplot2` for longitudinal data
+
+Recall from last week the R packages `dplyr`, for data processing and management and `ggplot2`, which produces high-quality graphics. Let's bring in these two packages as well as the data from last week (study on effect of diet on Australian cows' milk protein):
+
+```{r readInStuff, message=FALSE}
+library(dplyr)
+library(ggplot2)
+# change directories to where this file sits on your own computer!
+milk_long <- read.table("~/Documents/logdata/week2/milk_long.csv",
+                       header=TRUE,
+                       sep=",")
+head(milk_long)
+```
+
+Let's make a ggplot of all cows' protein levels by week:
+
+```{r plotAllCows}
+milk_graph <- ggplot(data=milk_long,
+                     aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    geom_point() +
+    geom_line() +
+    ggtitle("Protein levels in milk by week for each cow") +
+    theme_bw() +
+    scale_color_manual(values=c("mediumorchid4", "darkgoldenrod1", "deepskyblue"))
+
+milk_graph
+# How can we improve this?
+```
+
+In this example, we're using:
+
+* Aesthetics (`aes`):
+    - `x`: $x$-axis, our time variable (here, Week)
+    - `y`: $y$-axis, our outcome variable (here, Protein)
+    - `group`: our unit variable (here, Cow)
+    - `color`: variable we want to use to segment by color, usually should be coded as a factor variable (here, Diet)
+* Layers (parts separated by `+`) with a set of `()` taking arguments:
+    - `ggplot`: base layer containing information about the data and overall aesthetics with `aes()`
+    - `geom_point`: scatterplot points at $x$ and $y$ values
+    - `geom_line`: line connecting values within each group
+    - `ggtitle`: title for the plot.
+
+Additional aesthetics we can use are `shape` (symbols used for points, usually should be coded as a factor variable), `linetype`, `size` (dot size/line thickness), `alpha` (transparency level, 0 for fully transparent and 1 for fully opaque), and `fill` (color for areas like bar charts).
+
+When we want to change the appearance of parts of the graph in general that aren't related to specific variables (e.g. use large sized symbols for the `geom_point` layer), we pass those as non-aesthetic options to the layers; that is, in the specific layer and not enclosed in an `aes()` group in the `ggplot()` main layer. For more information on modifying colors, legends, etc., see <http://www.cookbook-r.com/Graphs/index.html>. For specific R color names, see <http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf>. Shapes and linetypes can be modified in a similar way, with more information at <http://www.cookbook-r.com/Graphs/Shapes_and_line_types>. 
+
+## Facets
+
+Recall we can improve graph legibility by using `facet_grid` to segment by diet:
+
+```{r milkFacetDiet, warning=FALSE, message=FALSE}
+# We decided that the vertical view was more useful
+milk_graph +
+    facet_grid(Diet ~ .)
+```
+
+If we had two variables to facet by (such as diet and species), the one before the `~` denotes how we split down facet rows, and the one after the `~` denotes how we split across facet columns.
+
+We can even facet down to the individual cow to get a panel for each of them, with a `facet_wrap( ~ Cow)` command.  But that's a lot of cows - `r length(unique(milk_long$Cow))` to be exact. That'll be hard to see and slow to render. We can sample some at random and use the `%in%` operator in R to check if IDs are in the sampled IDs list:
+```{r milkFacetDietRandom, warning=FALSE, message=FALSE}
+# setting a seed in R makes your "random" number generation reproducible
+set.seed(10715)
+# sample 20 cow IDs without replacement from the set of cow IDs
+sampled_cows <- sample(unique(milk_long$Cow), size=20, replace=FALSE)
+sampled_cows
+
+# apply filtering to the data to keep the cows appearing in sampled_cows
+# note use of the %in% operator
+ggplot(data=milk_long %>%
+           filter(Cow %in% sampled_cows),
+       aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    geom_line(alpha=0.5) +
+    ggtitle("Protein levels in milk by week for sampled cow") +
+    theme_bw() +
+    scale_color_manual(values=c("mediumorchid4", "darkgoldenrod1", "deepskyblue")) +
+    # 5 row, 4 column layout
+    facet_wrap( ~ Cow, ncol=4)
+```
+
+With facets, the axes are automatically set to the same scale, unless you add the option `scales="free"` to the `facet_grid` or `facet_wrap` layer. We can also set the $y$-axis manually by adding a layer `+ ylim(0,5)` to force the range between 0 and 5, or the $x$-axis manually `+ xlim(0,20)` to force the range between 0 and 20. Sometimes we will want to set the axes manually when the automatic choices exaggerate the amount of variation in trajectories.
+
+For more on facets, see <http://www.cookbook-r.com/Graphs/Facets_(ggplot2)>.
+
+# Fitting level 1 regressions
+
+Using `dplyr`, last week we used `group_by` to do summaries at different levels of the data. We can use other non-summary functions at the level of our groups by using the `do` function. We can fit a linear regression *for each cow* with protein as the outcome and week as the explanatory variable (i.e., fit a separate linear time trend for the protein in each cow's milk). Use the following code to get a data frame with one row per cow and one column each for its linear model's intercept, slope, and $R^2$ value:
+
+```{r regression, message=FALSE, warning=FALSE}
+milk_regression <- milk_long %>%
+    group_by(Diet, Cow) %>%
+    # use 'do' to run a linear regression with the grouped observations
+    # and store the summary object in a variable called indiv_model
+    do(indiv_model = summary(lm(Protein ~ Week, data=.))) %>%
+    # get the intercept, slope (coefficient of Week), and R^2 from the model objects
+    mutate(intercept = indiv_model[["coefficients"]]["(Intercept)","Estimate"],
+           slope = indiv_model[["coefficients"]]["Week","Estimate"],
+           r2 = indiv_model[["r.squared"]]) %>%
+    # drop the indiv_model object for each subject since we're done with it
+    select(-indiv_model)
+
+head(milk_regression)
+```
+
+How did I know to focus on the `lm` summary object for this information? Let's drill a little deeper into `lm` and its related objects. Start by making a simple linear model for one of the cows, say the fifth one:
+
+```{r debugDemo}
+# look at just one cow
+this_cow <- milk_long %>%
+    filter(Cow==5)
+head(this_cow)
+
+# fit a regression
+this_cow_line <- lm(Protein ~ Week, data=this_cow)
+
+# What is this_cow_line?
+class(this_cow_line)
+# What's inside that object?
+names(this_cow_line)
+# I see coefficients but not r squared. How about in the lm summary?
+class(summary(this_cow_line))
+names(summary(this_cow_line))
+```
+
+Since we see that both values we're searching for are in the `summary.lm` object, not the `lm` object, use that (i.e., make the `do` command above be a `summary(lm())` command).
+
+# Exploring level-1 regressions
+
+Recall that regression models are defined by their slope(s) and intercept. How are good ways to display these across the many cow-specific linear models in `milk_regression`.
+
+## Stem-and-leaf, histograms and density plots
+
+We've seen stem-and-leaf plots of the intercepts and slopes for the level-1 regressions. There is a function for this in base R called `stem`:
+
+```{r stemAndLeaf}
+stem(milk_regression$intercept, scale=2)
+```
+
+We can make histograms or density plots using `ggplot2` to examine the distributions of intercepts and slopes:
+
+```{r milkMarginalDists, warning=FALSE, message=FALSE}
+# histograms
+# note we only have x aesthetic, there is no "y" as this is created by geom_histogram
+ggplot(milk_regression, aes(x=slope)) +
+    geom_histogram(fill="magenta", binwidth=.01) +
+    ggtitle("Slopes from linear regressions fit to each cow")
+
+# density estimates
+ggplot(milk_regression, aes(x=slope)) +
+    geom_density(fill="magenta") +
+    ggtitle("Slopes from linear regressions fit to each cow")
+```
+
+With histograms, you may want to use `warning=FALSE, message=FALSE` in your chunk options in your `.Rmd` file since you will often get warnings and messages if you don't set `binwidth` and let `ggplot2` choose it for you. For density plots, you can adjust the bandwidth to make the plot more or less smooth using the `adjust` option in `geom_density`, which defaults to 1 (so a smaller number yields a smoother density curver and a large number makes a more jagged curve).
+
+See <http://www.cookbook-r.com/Graphs/Plotting_distributions_(ggplot2)> for more on `ggplot2` histograms and density plots.
+
+### Practice
+Try this out for the linear regression slopes. What patterns do you see? Try changing the `adjust` argument in `geom_density` - which value of `adjust` looks reasonable?
+
+## Scatterplots
+
+We can look at the relationship between fitted intercepts and slopes with a scatterplot:
+
+```{r intSlopeScatter}
+ggplot(data=milk_regression, aes(x=intercept, y=slope)) +
+# We could also break these out by diet using color or facets for another view
+  geom_point() +
+    ggtitle("Slope vs. intercept for level-1 regressions")
+```
+
+## Plotting level-1 regressions
+
+With `ggplot2`, you don't need to manually fit a regression for each subject to plot them across groups. The package can do it all for you with a `geom_line` layer with the argument `stat="smooth"` that applies to each aesthetic `group` separately:
+
+```{r level1Lines}
+# look at the level 1 regressions faceted out for the sample of cows
+ggplot(data=milk_long %>%
+           # just the sampled cows using %in%
+           filter(Cow %in% sampled_cows),
+       aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    geom_point() +
+    # adds fitted lines for each group to the plot using lm
+    geom_line(stat="smooth", method="loess") +
+    ggtitle("Protein levels in milk by week for sampled cow with linear fit") +
+    theme_bw() +
+    scale_color_manual(values=c("mediumorchid4", "darkgoldenrod1", "deepskyblue")) +
+    facet_wrap( ~ Cow, ncol=4)
+```
+
+### Practice
+
+For a non-parametric fit, try replacing `method="lm"` with `method="loess"` in `geom_line`. How does the linear fit compare with the non-linear non-parametric fit?  
+
+We can also look at all cows' fitted regression lines on one plot by dropping the facets and the scatterplot layer and adding some transparency:
+
+```{r level1Superimposed}
+ggplot(data=milk_long,
+       aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    geom_line(stat="smooth", method="lm", alpha=0.75) +
+    ggtitle("Linear fit for each cow's trajectory") +
+    theme_bw() +
+    scale_color_manual(values=c("mediumorchid4", "darkgoldenrod1", "deepskyblue"))
+```
+
+We can even specify using our own formula if we want to try, say, a quadratic trajectory for each cow:
+
+```{r level1Quadratic}
+ggplot(data=milk_long,
+       aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    # using a formula quadratic in time: y = a + b x + c x^2 + error
+    # the I(x^2) tells R to compute x^2 and handle this term separately
+    # you use standard R regression syntax in formula
+    geom_line(stat="smooth", method="lm",
+              formula= y ~ x + I(x^2), alpha=0.75) +
+    ggtitle("Quadratic fit for each cow's trajectory") +
+    theme_bw() +
+    scale_color_manual(values=c("mediumorchid4", "darkgoldenrod1", "deepskyblue"))
+```
+
+## Adding average trajectories
+
+We can add average trajectories with an additional `geom_line(stat="smooth")` layer, but this time overriding the aesthetics in the layer so that the group is all observations (`aes(group="1")`) or a subgroup of interest (`aes(group=Diet)`).
+
+```{r level1GroupMeans}
+ggplot(data=milk_long,
+       aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    geom_line(stat="smooth", method="lm", alpha=0.5) +
+    # add a layer for average linear models by group, in thicker lines (the size argument)
+    # keeping color=Diet in the aes so it uses the same colors as in the individual lines, and adding group=Diet so the models are grouped by diet
+    geom_line(stat="smooth", aes(group=Diet, color=Diet), method="lm", size=3, alpha=0.75) +
+    # add a layer for the overall mean, in thick (size argument) dashed (linetype argument) line
+    # use group="1" in the aes for an overall summary
+    geom_line(stat="smooth", aes(group="1"), color="black", method="lm",  size=2, linetype="dashed", alpha=0.75) +
+    ggtitle("Linear fit for each cow's trajectory") +
+    theme_classic() +
+    scale_color_manual(values=c("mediumorchid4", "darkgoldenrod1", "deepskyblue"))
+```
+
+There is a TON more you can do with `ggplot2`! Get inspiration at http://www.r-graph-gallery.com/portfolio/ggplot2-package/.
+
+# `tidyr` for reshaping data
+
+`tidyr` is a companion package to `dplyr` that is designed to reshape your data and uses the same piping `%>%` syntax. You can also use the `reshape` function in base R or functions in other packages to accomplish the same goal.
+
+## Wide to long
+
+As mentioned in lecture 2, usually we want our data in "long" format, which is better at accomodating irregular observations and necessary for plotting.
+
+```{r wideToLong, warning=FALSE, message=FALSE}
+# install.packages("tidyr")
+library(tidyr)
+
+# wide version of milk data
+milk_wide <- read.table("~/Documents/!PhD-UW/CSSS-594/ALDA/milk_wide.csv",
+                       header=TRUE,
+                       sep=",")
+head(milk_wide) # Note the NAs!
+```
+
+To get data into long format (= person-period level) from wide format (= person level), we use the `gather` function in `tidyr`:
+
+```{r wideToLong2, warning=FALSE, message=FALSE}
+milk_wide_to_long <- milk_wide %>%
+    # gather takes these arguments:
+    # key=name of the longitudinal variable to be created
+    # value=name of the variable measured at each occasion
+    # the rest are names of what you want to go from individual columns to values under the longitudinal variable
+    # note that any variable not mentioned will be unchanged
+    gather(key=Time, value=Protein, Wk1:Wk19) %>%
+    # sort it by Cow and Time using arrange
+    arrange(Cow, Time)
+head(milk_wide_to_long)
+```
+
+This worked pretty well, but I'd rather have numeric `Time` values instead of "Wk1", "Wk2", etc. so that I can plot things in the right order later. We can use the `separate` command in `tidyr` to fix this and split at the third position to take off the "Wk":
+```{r wideToLongSplit, warning=FALSE, message=FALSE}
+milk_wide_to_long <- milk_wide %>%
+    gather(key=Time, value=Protein, Wk1:Wk19) %>%
+    # separate takes these arguments:
+    # col=column we want to split up into two
+    # into=character strings for the names of new columns we want to create
+    # sep=the character at which we want to split the col variable
+    # (could also split based on punctuation - see ?separate)
+    # convert=TRUE means take anything that looks like a number and make it a number instead of character
+    separate(col=Time, into=c("prefix","Week"), sep=2, convert=TRUE) %>%
+    # now drop prefix since we don't need it (note the minus sign for dropping a variable)
+    select(-prefix) %>%
+    # sort by Cow and then the cleaned Week number
+    arrange(Cow, Week)
+
+head(milk_wide_to_long)
+```
+
+Finally, there are some missing values (`NA`'s) because `gather` assumes fixed number of measurement ocassions but some cows weren't observed every week. We can drop these in long format by filtering out those rows, which we can identify using the `is.na` command (returns TRUE when `NA`) and using `!` to mean *NOT* these rows:
+```{r dropNA}
+milk_wide_to_long <- milk_wide_to_long %>%
+    filter(!is.na(Protein))
+```
+
+## Long to wide 
+
+Occasionally "wide" format is useful, such as in computing correlations (e.g. correlation between cows' protein values at Week 1 and Week 2). If we didn't already have a wide version of the file and wanted it, we use the `spread` function in `tidyr`, which is the inverse of the `gather` function:
+
+```{r spreadDemo}
+milk_long_to_wide <- milk_long %>%
+    # make a column called week_name that has "Wk"+number, so we get variable names that aren't plain numbers
+    # paste0 is a function for concatenating text without adding spaces
+    mutate(week_name=paste0("Wk",Week)) %>%
+    # we can get rid of Week now because we have the new column
+    select(-Week) %>%
+    # spread takes these arguments:
+    # key=the variable to use for column names for the new columns in wide format,
+    # value=the variable to stick in as values for those columns
+    spread(key=week_name, value=Protein) %>%
+    # the new columns are in alphabetical order, not numeric order
+    # (Wk1, Wk10, Wk11, ..., Wk19, Wk2, Wk3, etc.)
+    # so use select to reorder them in the order we list
+    select(Diet, Cow, Wk1, Wk2:Wk9, Wk10:Wk19)
+
+head(milk_long_to_wide)
+```
+
+We need to be wary of NAs introduced into the wide data frame. Some functions have default NA handling; others require us to specify what to do with them. For example:
+
+```{r minDemo}
+# What's the minimum value of Wk19 for all cows?
+min(milk_long_to_wide$Wk19) # Won't work
+min(milk_long_to_wide$Wk19, na.rm=T) # Tell min() how to handle NAs
+```
+
+## Correlation matrices
+
+We can use the "wide" data to look at the correlation between protein values cows had at one week and any another week in the study.
+
+This code gets us the sample correlation matrix among protein levels in the first 6 weeks:
+
+```{r exampleCor, warning=FALSE, message=FALSE}
+milk_correlation <- milk_wide %>%
+    # just look at the first 6 weeks
+    select(Wk1:Wk6) %>%
+    # there are some missing values, let's use only observations with all 6 present ("complete.obs"). (Use this only when you know you don't need all observations!)
+    cor(x=., use="complete.obs")
+
+# correlation matrix formatted nicely with pander and a caption
+library(pander)
+# putting in some options to keep the decimal points under control
+panderOptions('round', 2)
+panderOptions('keep.trailing.zeros', TRUE)
+
+pander(milk_correlation,
+       # Don't forget to mention we're only using the complete observations!
+       caption="Correlation among milk protein levels in first 6 weeks, complete observations only")
+```

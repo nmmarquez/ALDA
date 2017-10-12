@@ -53,8 +53,7 @@ diet_cow_sum <- milk_long %>%
 
 range_by_diet <- diet_cow_sum %>%
         group_by(Diet) %>%
-        summarize(min_protien_sum=min(total_protein),
-                  max_protein_sum=max(total_protein))
+        summarize(range_protien_sum=max(total_protein) - min(total_protein))
 
 pander(range_by_diet)
 ```
@@ -66,7 +65,8 @@ With your `milk_long_quiz` dataset, make spaghetti plots of the cows' Protein (l
 ```{r question3, warning=FALSE, message=FALSE}
 library(ggplot2)
 # YOUR R CODE TO DO THE ABOVE GOES HERE
-ggplot(subset(milk_long, Week <= 3), aes(x=Week, y=Protein, 
+ggplot(milk_long %>% filter(Week <=3), aes(x=Week, y=Protein, 
                                          color=Diet, group=Cow)) +
-    geom_line() + facet_grid(.~Diet) + labs(title="First 3 week protein levels observed, by diet")
+    geom_line() + facet_grid(Diet~.) + 
+    labs(title="First 3 week protein levels observed, by diet")
 ```

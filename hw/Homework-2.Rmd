@@ -1,0 +1,224 @@
+---
+title: "Homework 2"
+author: "YOUR NAME HERE"
+date: "Due: 10/19/2017"
+output: html_document
+---
+# Exercise 1
+
+Background: The researchers studied changes in depression severity in a group of subjects with depression who were being treated with imipramine, an antidepressant (Riesby, 1977). Depression severity, the study outcome, was measured in 4 measurement occasions using the Hamilton Rating Scale (HAM-D). However, some subjects could not be measured each time, due to attrition and other factors; thus, some there are some missing values in the data. The researchers were primarily interested to study correlates of within-individual change in depression scores over the course of the treatment.
+The data are in depression_hw2.csv on Canvas. Download the data into R Studio and answer the following questions in full sentences using R Markdown, also showing relevant R code and plots.
+
+### Part a. 
+On which level is the data? Use words like person, person-period, long, wide. What is the name of the outcome variable, what is the name of the time variable, and what are the names of the covariates?
+
+The data is person period and in a long format. The outcome variable is labeled HamD, the time variable is labled Period, and the covariate "Sex" is divided into Males and Females.
+
+```{r}
+rm(list=ls())
+library(dplyr)
+library(pander)
+library(ggplot2)
+
+dep_data <- read.csv("~/Documents/logdata/hw/depression_hw2.csv")
+pander(head(dep_data))
+pander(table(dep_data$Sex))
+```
+
+### Part b.
+How many individuals are in the data? How many men and how many women? Not every individual had their depression measured each week. Output a table (formatted in `pander`) that shows how many measurements went missing each period (these are recorded as NAs) for that period's entry.
+
+```{r}
+
+total_N <- dep_data %>% 
+    group_by(Subject) %>% 
+    summarize(count=n()) %>% 
+    nrow
+
+male_N <- dep_data %>% 
+    filter(Sex=="Male") %>% 
+    group_by(Subject) %>%
+    summarize(count=n()) %>%
+    nrow
+
+female_N <- dep_data %>% 
+    filter(Sex=="Female") %>% 
+    group_by(Subject) %>%
+    summarize(count=n()) %>%
+    nrow
+
+### assert that all individuals have the same weeks
+sub1_periods <- (dep_data %>% filter(Subject == dep_data$Subject[1]))$Period
+
+all((dep_data %>%
+      group_by(Subject) %>%
+      summarize(all_periods_same=all(Period == sub1_periods)))$all_periods_same)
+
+### now we can count NAs using group by
+missing_by_period <- dep_data %>%
+    group_by(Period) %>%
+    summarize(missing_obs=sum(is.na(HamD)))
+
+pander(missing_by_period)
+```
+
+Above is the table for the number of individuals who are missing observations per period. The total number of individuals `r total_N` is the number of total individuals in the study while there are `r male_N` and `r female_N` male and female participants respectively.
+
+### Part c. 
+Filter out the data for just the first period for each individual, immediately after treatment was administered. Looking at men and women separately, report and interpret the minimum value and range for the outcome variable.
+
+```{r}
+sex_ranges <- dep_data %>% 
+    filter(Period==1) %>%
+    group_by(Sex) %>%
+    summarize(min_val=min(HamD, na.rm=T), max_val=max(HamD, na.rm=T)) %>%
+    mutate(range=max_val-min_val) %>%
+    select(Sex, min_val, range)
+
+pander(sex_ranges)
+```
+
+Male and females have about the same value for the minum value however the range for females is larger suggesting a higher maximum value and greater variance among women for the dependent variable.
+
+### Part d.
+In one panel, plot the growth trajectories of each individual's depression level. Color the female trajectories green and the male trajectories brown (use this color scheme for all subsequent plots). Comment on the trends you see.
+
+```{r}
+dep_data %>% filter(!is.na(HamD)) %>%
+    ggplot(aes(x=Period, y=HamD, color=Sex, group=Subject)) +
+    geom_line() + 
+    scale_color_manual(values=c(Male="brown", Female="green")) +
+    labs(title="Depression over Time")
+    
+```
+
+It is difficult to parse out much of a trend with all subjects over lapping each other pat it appears that in genreal there seems to be a decrease in the HamD score for depression over time.
+
+### Part e. 
+Draw a random sample of 8 individuals from each sex. Make sure to set the seed to 1515 as below. Plot the 16 individual growth trajectories (along with the values themselves) in a 4x4 matrix. Apply a non-parametric smoother for each growth trajectory. Discuss the trends visible here and whether linearity is a reasonable proposition for the trajectories. (You may need to alter the y-axis scale to make the curves more visible.)
+
+```{r message=F}
+set.seed(1515)
+# Now you can sample...
+sampleids <- c(sapply(c("Male", "Female"), function(x) 
+    sample(unique(subset(dep_data, Sex == x)$Subject), 8)))
+
+suppressWarnings(print(
+    dep_data %>% filter(Subject %in% sampleids & !is.na(HamD)) %>%
+        ggplot(aes(x=Period, y=HamD, color=Sex)) + geom_point() + 
+        geom_smooth(method="loess") +
+        facet_wrap(~Subject) + 
+        labs(title="Smoothed Trajectories of Depression") + 
+        scale_color_manual(values=c(Male="brown", Female="green"))))
+
+```
+
+It appears that the non parametric fit may be too smooth for this data and that a linear fit would suffice to descripe the overall relationship between time and depression as well as how they may be different between males and females.
+
+# Exercise 2
+
+### Part a.
+We seek to both model the depression growth trajectories of individuals and the effect of sex on those trajectories. We will do this in the two-level setup introduced in Lecture 3. Write a level-1 linear model for depression and the level-2 model for the growth parameters (make all the same distributional assumptions as in the Lecture 3 slides).
+
+#### Level 1
+$$
+Y_{ij} = [\pi_{0i} + \pi_{1i}(Period_{ij}-1)] + [\epsilon_{ij}] \\
+\epsilon_{ij} \sim \mathcal{N}(0, \sigma^2_{\epsilon})
+$$
+
+#### Level 2
+$$
+\pi_{0i} = \gamma_{00} + \gamma_{01}SEXMALE_i + \zeta_{0i} \\
+\pi_{1i} = \gamma_{10} + \gamma_{11}SEXMALE_i + \zeta_{1i} \\
+$$
+
+$$
+\
+\begin{bmatrix}
+   \zeta_{0i} \\
+   \zeta_{1i} \\
+\end{bmatrix} 
+\
+\sim \mathcal{N} \Bigg(
+\
+\begin{bmatrix}
+   0 \\
+   0 \\
+\end{bmatrix} 
+\
+,
+\begin{bmatrix}
+   \sigma_0^2 & \sigma_{01} \\
+   \sigma_{01} & \sigma_1^2 \\
+\end{bmatrix} 
+\
+\Bigg)
+$$
+
+
+
+### Part b. 
+Run linear regression models (level 1 models) for each individual. Report a nicely formatted table of the average slopes and intercepts along with their average standard errors.
+
+```{R}
+dep_regression <- dep_data %>%
+    group_by(Subject, Sex) %>%
+    # use 'do' to run a linear regression with the grouped observations
+    # and store the summary object in a variable called indiv_model
+    do(indiv_model = summary(lm(HamD ~ Period, data=.))) %>%
+    # get the intercept, slope (coefficient of Week), and R^2 from the model objects
+    mutate(intercept = indiv_model[["coefficients"]]["(Intercept)","Estimate"],
+           slope = indiv_model[["coefficients"]]["Period","Estimate"],
+           intercept.se = indiv_model[["coefficients"]]["(Intercept)","Std. Error"],
+           slope.se = indiv_model[["coefficients"]]["Period","Std. Error"]) %>%
+    # drop the indiv_model object for each subject since we're done with it
+    select(-indiv_model)
+
+param_averages <- dep_regression %>% group_by(.) %>% summarise_all(funs(mean)) %>%
+    select(intercept, intercept.se, slope, slope.se)
+
+pander(param_averages)
+```
+
+### Part c. 
+For the sampled subjects, plot their depression levels and the corresponding linear models. Color again by sex and plot on a 4x4 grid. Make a few comments about model fit.
+
+```{r}
+suppressWarnings(print(
+    dep_data %>% filter(Subject %in% sampleids & !is.na(HamD)) %>%
+        ggplot(aes(x=Period, y=HamD, color=Sex)) + geom_point() + 
+        geom_smooth(method="lm") +
+        facet_wrap(~Subject) + 
+        labs(title="Linear Model Trajectories of Depression") + 
+        scale_color_manual(values=c(Male="brown", Female="green"))))
+```
+
+The level 1 linear models appear to do a good job capturing the variation of the data. A linear association appears to exist between the two variables.
+
+### Part d. 
+Make a scatterplot of fitted intercepts versus fitted slopes for males and females on one plot. Color-code the points by Sex. Comment on your observations: Are there apparent differences in the distributions of intercepts and slopes between the two groups?
+
+```{r}
+ggplot(dep_regression, aes(x=intercept, y=slope, color=Sex)) + 
+    geom_point() + labs(title="Level 1: Slope vs Intercept Estimates") + 
+        scale_color_manual(values=c(Male="brown", Female="green"))
+```
+
+Though the associations of the slope and intercepts appear to be negatively correlated for both males and females the range of values taken for both parameters is greater for females than males.
+
+### Part e. 
+Plot the linear models for all individuals on one plot, color coding as in the previous problem. Overlay the average linear model for all men and for all women in a matching color but thicker line size. Finally, overlay the average linear model across all individuals in a thick black line. Are there apparent differences between the three average trajectories?
+
+```{R}
+dep_data %>% filter(!is.na(HamD)) %>%
+ggplot(aes(x=Period, y=HamD, group=Subject, color=Sex)) +
+    geom_line(stat="smooth", method="lm", alpha=0.2) +
+    geom_line(stat="smooth", aes(group=Sex, color=Sex), method="lm", size=3, alpha=.5) +
+    geom_line(stat="smooth", aes(group="1"), color="black", method="lm",  size=2, alpha=0.75) +
+    ggtitle("Linear fit for each Subject's trajectory") +
+    theme_classic() +
+    scale_color_manual(values=c(Male="brown", Female="green")) + 
+    ylim(c(0, 40))
+```
+
+The average trajectory for both males and females appear to be very similar to one another and because of this they are also very similar to the average value.
