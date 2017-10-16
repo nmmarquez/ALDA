@@ -162,15 +162,16 @@ Run linear regression models (level 1 models) for each individual. Report a nice
 
 ```{R}
 dep_regression <- dep_data %>%
+    mutate(Period0 = Period - min(Period)) %>%
     group_by(Subject, Sex) %>%
     # use 'do' to run a linear regression with the grouped observations
     # and store the summary object in a variable called indiv_model
-    do(indiv_model = summary(lm(HamD ~ Period, data=.))) %>%
+    do(indiv_model = summary(lm(HamD ~ Period0, data=.))) %>%
     # get the intercept, slope (coefficient of Week), and R^2 from the model objects
     mutate(intercept = indiv_model[["coefficients"]]["(Intercept)","Estimate"],
-           slope = indiv_model[["coefficients"]]["Period","Estimate"],
+           slope = indiv_model[["coefficients"]]["Period0","Estimate"],
            intercept.se = indiv_model[["coefficients"]]["(Intercept)","Std. Error"],
-           slope.se = indiv_model[["coefficients"]]["Period","Std. Error"]) %>%
+           slope.se = indiv_model[["coefficients"]]["Period0","Std. Error"]) %>%
     # drop the indiv_model object for each subject since we're done with it
     select(-indiv_model)
 
