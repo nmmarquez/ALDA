@@ -1,0 +1,326 @@
+---
+title: "Modeling with lme"
+subtitle: "CSSS 594, Lab 4"
+author: "Max Schneider"
+date: "October 19, 2017"
+output:
+    html_document:
+        toc: true
+        theme: cosmo
+        highlight: haddock
+        number_sections: true
+---
+
+```{r loadLibraries, warning=FALSE, message=FALSE}
+# load useful libraries for this lab
+library(dplyr)
+library(nlme)
+library(pander)
+panderOptions('round', 3)
+panderOptions('keep.trailing.zeros', TRUE)
+library(ggplot2)
+
+```
+
+# Introduction
+
+In this lab, we will learn how to do most of the model-fitting calculations shown in Lecture 4 using the tolerance data, where $i$ is each subject and $j$ is years since age 11 (0-4 years). The "treatment" of interest is exposure to deviant behavior at age 11, which we are dichotomizing into "high" exposure and "low" exposure.
+
+* Level 1:
+
+$$
+\text{tol}_{ij} = \pi_{0i} + \pi_{i1} \cdot time_j + \varepsilon_{ij}
+$$
+
+$$
+\varepsilon_{ij} \sim \text{Normal}(0,\sigma_\varepsilon^2).
+$$
+
+* Level 2:
+
+$$
+\pi_{0i} = \gamma_{00} + \gamma_{01} \cdot I(\text{expo}_i=\text{high}) + \zeta_{0i}
+$$
+
+$$
+\pi_{1i} = \gamma_{10} + \gamma_{11} \cdot I(\text{expo}_i=\text{high})  + \zeta_{1i}
+$$
+
+$$ 
+\left[ \begin{array}{c} \zeta_{0i} \\ \zeta_{1i} \end{array} \right] \sim \text{Normal}\left( \left[ \begin{array}{c} 0 \\ 0 \end{array} \right], \left[ \begin{array}{cc} \sigma_0^2 & \sigma_{01} \\ \sigma_{01} & \sigma_1^2 \end{array} \right] \right).
+$$
+
+```{r importTolerance, warning=FALSE, message=FALSE, cache=TRUE}
+# change the path for your own computer!
+tolerance <- read.table("~/Documents/!PhD-UW/CSSS-594/ALDA/tolerance1_pp.csv",
+                       header=TRUE,
+                       sep=",")
+# make an indicator for low/high exposure, based on being above/below the median
+median(tolerance$exposure)
+# high exposure is greater than median
+tolerance <- tolerance %>%
+    mutate(high_expo=ifelse(exposure >= median(exposure),1,0))
+head(tolerance)
+```
+
+## Working with the composite model of change
+
+To fit models using the `lme` function, we need to identify the "fixed" and "random" parts of the model because we have to specify these separately. Going from the multilevel model to the composite model we saw in Lecture 5, we can separate the **fixed** (not varying by subject, no governing distribution assumed) and **random** (varying by subject and comes from an assumed distribution, i.e. has $i$ in coefficient subscript and is drawn from a normal distribution) terms. For the tolerance model:
+
+$$
+\begin{aligned}
+\text{tol}_{ij} &= [\pi_{0i} + \pi_{i1} \cdot j] + \varepsilon_{ij} \text{ (the level-1 model)}\\
+&= \left[(\gamma_{00} + \gamma_{01} \cdot I(\text{expo}_i=\text{high}) + \zeta_{0i}) + (\gamma_{10} + \gamma_{11} \cdot I(\text{expo}_i=\text{high})  + \zeta_{1i}) \cdot time_j \right] + \varepsilon_{ij} \text{ (plug in level-2 formulas)}\\
+&= \underbrace{\left[\gamma_{00} + \gamma_{01} \cdot I(\text{expo}_i=\text{high}) + \gamma_{10}\cdot time_j + \gamma_{11} \cdot I(\text{expo}_i=\text{high}) \cdot time_j \right]}_{\text{fixed: coefs don't depend on }i} + \underbrace{\left[\zeta_{0i} + \zeta_{1i} \cdot time_j \right]}_{\text{random: coefs do depend on }i} + \varepsilon_{ij} 
+\end{aligned}
+$$
+What will we be estimating here?
+
+# Fitting models with `lme`
+
+Now, to implement this model in R, we use the `lme` function in the `nlme` package:
+
+```{r nlme1, cache=TRUE}
+tolerance_model1 <- lme(fixed= tolerance ~ high_expo*time,
+                     data=tolerance,
+                     random=reStruct(~ 1 + time | id, pdClass="pdSymm"),
+                     method="ML")
+```
+
+Let's unpack the syntax used for `lme`:
+
+* `fixed= tolerance ~ high_expo*time`: this tells `lme` that we want the fixed effects component of the model to have the following structure: $$E[\text{tol}_{ij} | \text{time}=j, \text{expo}_i] = \gamma_{00} + \gamma_{01} \cdot I(\text{expo}_i=\text{high}) + \gamma_{10}\cdot time_j + \gamma_{11} \cdot I(\text{expo}_i=\text{high}) \cdot time_j.$$ We could have also said `fixed= tolerance ~ high_expo + time + high_expo:time` to get the same result, but the `*` notation is more compact.
+* `random=reStruct(~ 1 + time | id, pdClass="pdSymm")`:
+    - `reStruct` means "random effects structure". This is optional and you will very often see it omitted, but we use it when we want to be specific about the `pdClass` parameter discussed below.
+    - The part right after `|` specifies which variable defines our subjects, i.e. the level subscripted $i$ at which we want to have individual trajectories. In our data, the subjects are given by `id`.
+    - The part after the `~` to the left of the `|` specifies individual-level (level-2) components of the composite model. Our level-2 model included subject-specific intercepts (`1`) and slopes (`time`) (the $\zeta_{0i} + \zeta_{1i} \cdot time_j$ pieces), so we write `1 + time`. To do just the intercept, so that every subject has the same fitted slope but different time zero values, we'd write `~ 1 | id`. To do just the slope so that every subject has a different rate of change but the same intercept (not common), we'd write `~ 0 + time | id`.
+    - The `pdClass="pdSymm"` part is optional (and unnecessary if you have only one set of random parameters), but states explicitly that we want to allow any valid covariance matrix for the distribution our subject-specific intercepts and slopes. This includes the possibility that intercepts and slopes are correlated with $\sigma_{01} \ne 0$: $$ \left[ \begin{array}{c} \zeta_{0i} \\ \zeta_{1i} \end{array} \right] \sim \text{Normal}\left( \left[ \begin{array}{c} 0 \\ 0 \end{array} \right], \left[ \begin{array}{cc} \sigma_0^2 & \sigma_{01} \\ \sigma_{01} & \sigma_1^2 \end{array} \right] \right). $$ 
+We can also user more a restrictive covariance structures such as the "independence" model (no correlation between slopes and intercepts) by changing it to `pdClass="pdDiag"`, which imposes the structure: $$ \left[ \begin{array}{c} \zeta_{0i} \\ \zeta_{1i} \end{array} \right] \sim \text{Normal}\left( \left[ \begin{array}{c} 0 \\ 0 \end{array} \right], \left[ \begin{array}{cc} \sigma_0^2 & 0 \\ 0 & \sigma_1^2 \end{array} \right] \right).$$
+* `method="ML"`: this tells `lme` to use maximum likelihood to estimate the parameters. The alternative way to estimate the parameters is `method="REML"`, which uses restricted maximum likelihood, and is the default choice in `lme` if you don't tell it otherwise.
+
+# Reading the `lme` output
+
+Here is the summary of our fitted model using `lme`:
+
+```{r summaryLme}
+summary(tolerance_model1)
+```
+
+There is a lot of information here, but we can find estimates for each of our parameters if we know where to look.
+
+* Fixed effects (estimates and errors) are available in the `Fixed effects` section of the output:
+    - $\hat{\gamma}_{00}$ = $`r round(fixef(tolerance_model1)["(Intercept)"],3)`$: mean intercept for subjects with low exposure
+    - $\hat{\gamma}_{01} = `r round(fixef(tolerance_model1)["high_expo"],3)`$: difference in mean intercepts for subjects with high exposure vs. low exposure
+    - $\hat{\gamma}_{10} = `r round(fixef(tolerance_model1)["time"],3)`$: mean slope for subjects with low exposure
+    - $\hat{\gamma}_{11} = `r round(fixef(tolerance_model1)["high_expo:time"],3)`$: difference in mean slopes for subjects with high exposure vs. low exposure
+* Random effects: there are two estimated **per subject** (one intercept term $\hat{\zeta}_{0i}$ and one slope term $\hat{\zeta}_{1i}$). These aren't reported in the `summary` output because we can have a lot of subjects! See `## Number of Groups` for how many subjects there are (`r tolerance_model1$dims$ngrps["id"]`).
+* Variance parameters are available in the `## Random effects` section of the output and are reported as standard deviations:
+    - $\hat{\sigma}_0^2 = `r round(as.numeric(VarCorr(tolerance_model1)["(Intercept)","StdDev"]),3)`^2 = `r round(as.numeric(VarCorr(tolerance_model1)["(Intercept)","Variance"]),3)`$: variance in random intercepts
+    - $\hat{\sigma}_1^2 = `r round(as.numeric(VarCorr(tolerance_model1)["time","StdDev"]),3)`^2 = `r round(as.numeric(VarCorr(tolerance_model1)["time","Variance"]),3)`$: variance in random slopes
+    - $\hat{\rho}_{01} = `r round(as.numeric(VarCorr(tolerance_model1)["time","Corr"]),3)`$: correlation between random slopes and intercepts
+    - $\hat{\sigma}_{01} = \underbrace{\hat{\rho}_{01} \cdot \hat{\sigma}_0 \cdot \hat{\sigma}_1}_{\text{formula for covariance}} = `r round(as.numeric(VarCorr(tolerance_model1)["time","Corr"]),3)` \cdot `r round(as.numeric(VarCorr(tolerance_model1)["(Intercept)","StdDev"]),3)` \cdot `r round(as.numeric(VarCorr(tolerance_model1)["time","StdDev"]),3)` = `r round(as.numeric(VarCorr(tolerance_model1)["time","Corr"])*as.numeric(VarCorr(tolerance_model1)["(Intercept)","StdDev"])*as.numeric(VarCorr(tolerance_model1)["time","StdDev"]),4)`$: covariance between random slopes and intercepts
+    - $\hat{\sigma}_\varepsilon^2 = `r round(as.numeric(VarCorr(tolerance_model1)["Residual","StdDev"]),3)`^2 = `r round(as.numeric(VarCorr(tolerance_model1)["Residual","Variance"]),3)`$: residual variance of errors around subject-specific trends
+    
+## Extracting parameter estimates
+
+Getting the specific parameter estimates from `lme` objects can be tricky.
+
+### Fixed effects
+
+Fortunately, fixed effects are relatively straightforward. You can use the `fixef` function in `nlme` to grab the fixed effects:
+
+```{r getFixedEffects}
+# access fixed effects using fixef function
+fixed_model1 <- fixef(tolerance_model1)
+fixed_model1
+```
+
+Individual terms can be accessed using their names, e.g. the intercept is `fixed_model1["(Intercept)"]` and the interaction between time and exposure is `fixed_model1["high_expo:time"]`. You can find these exact names using the `names()` function.
+
+If we want the standard errors or p-values for fixed effect hypothesis testing, we'll need the more complete coefficients that come from using `summary` and accessing the `tTable` item.
+
+```{r getFullFixedEffects}
+# access full info on fixed effects with summary
+fixed_full_model1 <- summary(tolerance_model1)$tTable
+fixed_full_model1
+```
+
+### Random effects
+
+If we need the random effect estimates $\hat{\zeta}_{0i}$ and $\hat{\zeta}_{1i}$, these are in the function `ranef` in `nlme`.
+
+```{r getRandomEffects}
+# access random effects using ranef function
+random_model1 <- ranef(tolerance_model1)
+head(random_model1)
+```
+
+This is a set of estimates for each subject and have row names corresponding to each `id` in the data. To get the estimated random effects for subject 569, for example, we can do `random_model1["569",]` to see their estimated deviation from the level-2 trend. (Note the quotes for row names --- we mean **subject** 569, not **row number** 569!)
+
+```{r subject569}
+random_model1["569",]
+```
+
+From this and the `summary` output, we see that subject 569's value at time zero ($\hat{\zeta}$$_{0,569}=`r round(random_model1["569","(Intercept)"],3)`$) is higher than the mean intercept by about one standard deviation (${\hat \sigma}$$_0=`r round(as.numeric(VarCorr(tolerance_model1)["(Intercept)","StdDev"]),3)`$), and their change in tolerance of deviant behavior each year ($\hat{\zeta}_{1,569}=`r round(random_model1["569","time"],3)`$) is lower than the mean slope by about half a standard deviation ($\hat{\sigma}_1=`r round(as.numeric(VarCorr(tolerance_model1)["time","StdDev"]),3)`$). Which key assumption are we invoking in these statements?
+
+### Variance parameters
+
+Variance parameters are more annoying to extract from `lme` output. We will use the `VarCorr` function in `lme` to do this, but with some modifications.
+
+```{r getVariance}
+# access random effects using VarCorr function
+var_model1 <- VarCorr(tolerance_model1)
+var_model1
+```
+
+This *looks* okay, but using `str` reveals something strange:
+
+```{r strVarCorr}
+str(var_model1)
+```
+
+For some reason, `nlme` encodes numerical value as characters in the output of the `VarCorr` function. In order to actually do math with these numbers, we need to convert this to a numeric matrix instead of character. You will get a warning "`NAs introduced by coercion`" when you do this, so I recommend using `warning=FALSE` in your R Markdown code chunk so that this doesn't show up on your write-ups.
+
+```{r fixBadVariance}
+# patch up the numeric formatting and keep the matrix shape and names
+# note: if you use as.numeric instead if storage.mode,
+# the matrix will lose its shape and row/column names
+storage.mode(var_model1) <- "numeric"
+str(var_model1)
+```
+
+Now we're in numerical mode. As before, the variances in the random intercepts and slopes are given by their row names: `var_model1["(Intercept)","Variance"]` and `var_model1["time","Variance"]`.
+
+The correlation between random intercepts and slopes is in `var_model1["time","Corr"]`. If you want the *covariance* instead of the *correlation*, you need to do a little math like we did above and multiply the correlation by the standard deviations for intercept and slope.
+
+Finally, the residual variance around subject-specific trend lines is stored in `var_model1["Residual","Variance"]`.
+
+### Practice
+Create `tolerance_model2` by replacing high exposure with gender. Run all the code we've seen so far. Can you comment on the effect of gender on tolerance of deviant behavior? Which variance components are high/low for `tolerance_model2`?
+
+# Mean fixed effect models
+
+## Writing formulas
+
+Now that we know how to access important numbers, we can use these to write down the estimated mean model for individual-level intercepts and slopes --- that is, where the random effects are zero:
+
+* Intercepts: $\hat{\pi}_{0i}$ = `r round(fixed_model1["(Intercept)"],3)` - `r round(abs(fixed_model1["high_expo"]),3)` $\cdot$ I(exposure~i~=high). The line to put in your `.Rmd` document to get it to look like this:
+```{r, eval=FALSE}
+$\hat{\pi}_{0i}$ = `r round(fixed_model1["(Intercept)"],3)` - `r round(abs(fixed_model1["high_expo"]),3)` $\cdot$ I(exposure~i~=high)
+```
+
+Comment: I was fussy here and didn't want it to say "`r round(fixed_model1["(Intercept)"],3)` + `r round(fixed_model1["high_expo"],3)` $\cdot$ I(exposure~i~=high)" with the "+-" in the formula, so I used a minus sign and took the absolute value of the exposure term to get a more natural-looking equation. You don't have to do this when you have negative values in coefficients, but it looks better in a report.
+
+* Slopes: $\hat{\pi}_{1i}$ = `r round(fixed_model1["time"],3)` + `r round(fixed_model1["high_expo:time"],3)` $\cdot$ I(exposure~i~=high). The line to put in your `.Rmd` document to get it to look like this:
+```{r, eval=FALSE}
+$\hat{\pi}_{1i}$ = `r round(fixed_model1["time"],3)` + `r round(fixed_model1["high_expo:time"],3)` $\cdot$ I(exposure~i~=high)
+```
+
+## Plotting prototypical trends
+
+To illustrate prototypical trends, we make a dataset with some example subjects in it and use the model to get predicted values for them, with assumed random effects of zero.
+
+```{r makePredictedDataSet}
+# time values we want to look at
+time_values <- unique(tolerance$time)
+# exposure levels we want to look at
+expo_values <- unique(tolerance$high_expo)
+# use expand.grid to take all combos
+# of time and exposure in a data frame
+model_dt <- expand.grid(time=time_values, high_expo=expo_values)
+model_dt
+```
+
+If we had had more covariates to account for, we could pass additional vectors to `expand.grid` giving specific levels of those to hold constant, e.g. if gender had been involved in the model too, we'd want to include `male=c(0,1)` in `expand.grid` to get separate prototypical trajectories for male children and female children who were exposed or not exposed to high levels of deviant behavior.
+ 
+```{r addOnPredictions}
+# now use the model to make predictions
+# at level 0 (fixed effects only)
+# newdata=. means use the data piped into it
+# if your model needs additional covariates besides
+# what is on model_dt, you'll get an error
+model_dt <- model_dt %>%
+    # make a column for predicted tolerance
+    mutate(pred_tol1=predict(tolerance_model1,
+                            newdata=.,
+                            level=0))
+```
+
+We will use this dataset with the mean (predicted) values to make a nice plot showing the fitted mean trajectories:
+
+```{r plotMeans}
+# make a prettier factor variable for exposure (nicer legend)
+model_dt <- model_dt %>%
+    mutate(Exposure=factor(ifelse(high_expo==1,"High","Low")))
+
+# using the model_dt for plotting, now
+# not the original tolerance data
+ggplot(data=model_dt,
+       aes(x=time, y=pred_tol1, group=Exposure, color=Exposure)) +
+    geom_line() +
+    ggtitle("Fitted mean trajectories by exposure\nto deviant behavior at age 11") +
+    # the \n above means line break, use to manually wrap text
+    xlab("Time (years since age 11)") +
+    ylab("Average tolerance of deviant behavior") +
+    ylim(1,4) # use the range of possible values so as not to distort
+```
+
+### Practice
+Add mean trajectories for the male and female groups in your `tolerance_model2`.
+
+# Presenting random effect information
+
+## Variance component table
+
+Pander isn't the right tool for displaying data frames that have both characters and numbers. For example:
+
+```{r, panderNotOptimal}
+pander(var_model1)
+```
+
+We can reproduce the table in Lecture 4 showing variance components using R Markdown formatting and the `var_model1` object we extracted from the output:
+
+```{r, eval=FALSE}
+| **Variance components** | | **Parameter** | **Estimate** |
+|-|-|-|-|
+| Level 1 | Within-person | $\sigma_\varepsilon$ | `r round(var_model1["Residual","StdDev"],2)` |
+| Level 2 | In initial status | $\sigma_0$ | `r round(var_model1["(Intercept)","StdDev"],2)` |
+| | In rate of change | $\sigma_1$ | `r round(var_model1["time","StdDev"],2)` |
+| | Correlation | $\rho_{01}$ | `r round(var_model1["time","Corr"],2)` |
+```
+That code makes this table:
+
+| **Variance components** | | **Parameter** | **Estimate** |
+|---------------------|-------------------|-----------|----------|
+| Level 1 | Within-person | $\sigma_\varepsilon$ | `r round(var_model1["Residual","StdDev"],2)` |
+| Level 2 | In initial status | $\sigma_0$ | `r round(var_model1["(Intercept)","StdDev"],2)` |
+| | In rate of change | $\sigma_1$ | `r round(var_model1["time","StdDev"],2)` |
+| | Correlation | $\rho_{01}$ | `r round(var_model1["time","Corr"],2)` |
+
+Note: For help with making tables in R Markdown that aren't `pander` output, see <http://www.tablesgenerator.com/markdown_tables> for a web generator.
+
+## Approximate intervals for random effects
+
+We assumed the random effects $\zeta_{0i}$ and $\zeta_{1i}$ came from a normal distribution. Under that assumed model, we can use the standard deviation estimates $\hat{\sigma}_0$ and $\hat{\sigma}_1$ and the means given by the fixed effects $\hat{\gamma}_{00}$, $\hat{\gamma}_{01}$, $\hat{\gamma}_{10}$, and $\hat{\gamma}_{11}$ to come up with approximate 95% intervals for the distribution of intercepts and slopes in the population the sample came from.
+
+Let's look at 95% intervals for the high exposure group:
+```{r intervalPractice}
+# 95% intervals for intercepts and slopes
+# for high exposure group
+mean_int_high <- fixed_model1["(Intercept)"] + 1*fixed_model1["high_expo"]
+sd_int <- var_model1["(Intercept)","StdDev"]
+ci_int_high <- c(mean_int_high-1.96*sd_int,
+                 mean_int_high+1.96*sd_int)
+ci_int_high
+
+mean_slope_high <- fixed_model1["time"] + 1*fixed_model1["high_expo:time"]
+sd_slope <- var_model1["time","StdDev"]
+ci_slope_high <- c(mean_slope_high-1.96*sd_slope,
+                   mean_slope_high+1.96*sd_slope)
+ci_slope_high
+```
+
+### Practice
+Make the same two confidence intervals for your model `tolerance_model2`. Does the confidence interval for the estimated slope for the male group cross zero? How about for the female group?
+
+# Quiz 2. Starts at 11am.
