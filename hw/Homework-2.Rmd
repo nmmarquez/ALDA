@@ -1,6 +1,6 @@
 ---
 title: "Homework 2"
-author: "YOUR NAME HERE"
+author: "Neal Marquez"
 date: "Due: 10/19/2017"
 output: html_document
 ---
@@ -20,7 +20,7 @@ library(dplyr)
 library(pander)
 library(ggplot2)
 
-dep_data <- read.csv("~/Documents/logdata/hw/depression_hw2.csv")
+dep_data <- read.csv("./depression_hw2.csv")
 pander(head(dep_data))
 pander(table(dep_data$Sex))
 ```
