@@ -10,7 +10,7 @@ library(ggplot2)
 
 ## ----importTolerance, warning=FALSE, message=FALSE, cache=TRUE-----------
 # change the path for your own computer!
-tolerance <- read.table("~/Documents/!PhD-UW/CSSS-594/ALDA/tolerance1_pp.csv",
+tolerance <- read.table("./tolerance1_pp.csv",
                        header=TRUE,
                        sep=",")
 # make an indicator for low/high exposure, based on being above/below the median
@@ -52,6 +52,8 @@ random_model1["569",]
 var_model1 <- VarCorr(tolerance_model1)
 var_model1
 
+
+
 ## ----strVarCorr----------------------------------------------------------
 str(var_model1)
 
@@ -61,6 +63,7 @@ str(var_model1)
 # the matrix will lose its shape and row/column names
 storage.mode(var_model1) <- "numeric"
 str(var_model1)
+var_model1[2,3]/prod(var_model1[1:2,1])
 
 ###### 
 # Practice 1! 
@@ -69,6 +72,12 @@ str(var_model1)
 # Run all the code we've seen so far. 
 # Can you comment on the effect of gender on tolerance of deviant behavior? 
 # Which variance components are high/low for tolerance_model2?
+
+tolerance_model2 <- lme(fixed= tolerance ~ male*time,
+                        data=tolerance,
+                        random=reStruct(~ 1 + time | id, pdClass="pdSymm"),
+                        method="ML")
+summary(tolerance_model2)
 
 ## ----makePredictedDataSet------------------------------------------------
 # time values we want to look at
@@ -79,6 +88,8 @@ expo_values <- unique(tolerance$high_expo)
 # of time and exposure in a data frame
 model_dt <- expand.grid(time=time_values, high_expo=expo_values)
 model_dt
+model_dt2 <- expand.grid(time=time_values, high_expo=expo_values,
+                         id=unique(tolerance$id)) 
 
 ## ----addOnPredictions----------------------------------------------------
 # now use the model to make predictions at level 0 (fixed effects only)
@@ -89,6 +100,12 @@ model_dt <- model_dt %>%
     mutate(pred_tol1=predict(tolerance_model1,
                             newdata=.,
                             level=0))
+
+model_dt2 <- model_dt2 %>%
+    # make a column for predicted tolerance
+    mutate(pred_tol1=predict(tolerance_model1,
+                             newdata=.,
+                             level=1))
 
 ## ----plotMeans-----------------------------------------------------------
 # make a prettier factor variable for exposure (nicer legend)
@@ -110,6 +127,38 @@ ggplot(data=model_dt,
 # Practice 2! 
 ###### 
 # Add mean trajectories for the male and female groups in your tolerance_model2.
+
+model2_dt <- expand.grid(time=time_values, male=0:1)
+model2_dt
+
+model2_dt <- model2_dt %>%
+    # make a column for predicted tolerance
+    mutate(pred_tol1=predict(tolerance_model2,
+                             newdata=.,
+                             level=0))
+
+model2_dt <- model2_dt %>%
+    mutate(Sex=factor(ifelse(male==1,"Male","Female")))
+
+ggplot(data=model2_dt,
+       aes(x=time, y=pred_tol1, group=Sex, color=Sex)) +
+    geom_line() +
+    ggtitle("Fitted mean trajectories by Sex\nto deviant behavior at age 11") +
+    # the \n above means line break, use to manually wrap text
+    xlab("Time (years since age 11)") +
+    ylab("Average tolerance of deviant behavior") +
+    ylim(1,4) # use the range of possible values so as not to distort
+
+ggplot(data=model2_dt,
+       aes(x=time, y=pred_tol1, group=Sex, color=Sex)) +
+    geom_line() +
+    ggtitle("Fitted mean trajectories by Group\nto deviant behavior at age 11") +
+    # the \n above means line break, use to manually wrap text
+    xlab("Time (years since age 11)") +
+    ylab("Average tolerance of deviant behavior") +
+    ylim(1,4) + # use the range of possible values so as not to distort
+    geom_line(aes(x=time, y=pred_tol1, group=Exposure, color=Exposure), data=model_dt) +
+    scale_colour_discrete(name = "Group")
 
 ## ---- panderNotOptimal---------------------------------------------------
 pander(var_model1)

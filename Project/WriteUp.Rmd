@@ -1,0 +1,47 @@
+---
+title: "Project Ideas"
+author: "Neal Marquez"
+date: "October 19, 2017"
+output: html_document
+---
+
+## Data Sources  
+
+[College Admitted Data](https://www.universityofcalifornia.edu/infocenter/admissions-source-school)  
+[HS Demographics](https://www.cde.ca.gov/ds/sd/sd/#g)
+
+## Simple Model Specification  
+
+### Notion
+$$
+\begin{aligned}
+k & = \text{ethnic group} \\
+i & = \text{school} \\
+j & = \text{year} \\
+A & = \text{Admitted} \\
+S & = \text{Applied} \\
+N^N & = \text{Population} \\
+N^E & = \text{UC eligable Population}
+\end{aligned}
+$$
+
+### Model Form
+$$
+\begin{aligned}
+\lambda_{kij} & = \pi_{ki0} + \pi_{ki1} \text{year} + \epsilon_{kij} \\
+\pi_{ki0} & = \gamma_{k00} + \gamma_{k01} \text{diversityindex} + 
+    \zeta_{ki0} \\
+\pi_{ki1} & = \gamma_{k10} + \gamma_{k11} \text{diversityindex} + 
+    \zeta_{ki1} \\
+\end{aligned}
+$$
+
+### Data likelihood Ideas  
+$$
+\begin{aligned}
+A_{kij} & \sim Poisson(exp(\lambda_{kij}) N^{N}_{kij}) \\
+A_{kij} & \sim Poisson(exp(\lambda_{kij}) N^{E}_{kij}) \\
+S_{kij} & \sim Poisson(exp(\lambda_{kij}) N^{N}_{kij}) \\
+S_{kij} & \sim Poisson(exp(\lambda_{kij}) N^{E}_{kij})
+\end{aligned}
+$$
