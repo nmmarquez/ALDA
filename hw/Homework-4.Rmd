@@ -1,0 +1,299 @@
+---
+title: "Homework 4"
+author: "Neal Marquez"
+date: "Due: Tues, 11/07/2017"
+output: html_document
+---
+
+Background: We will revisit the depression dataset from Homework 2. The researchers studied changes in depression severity in a group of subjects with depression who were being treated with imipramine, an antidepressant (Riesby, 1977). Depression severity, the study outcome, was measured on 4 measurement occasions using the Hamilton Rating Scale (HAM-D). The type of depression experienced was also recorded - either "endogenous" depression that occurs spontaneously (i.e., has no known external cause) or "nonendogenous" or reactive depression that is associated with some tragic life event. Some subjects could not be measured each time, due to attrition and other factors; thus, there are some missing values in the data. The researchers were primarily interested to study correlates of within-individual change in depression scores over the course of the treatment. 
+
+The data are in depression_hw4.csv on Canvas. Download the data into R Studio and answer the following questions in full sentences using R Markdown, also showing relevant R code and plots. For all your solutions, please hide model summaries or any other R output beyond what is needed to answer the questions -- though do show R code used to calculate results (use the appropriate R Markdown options for this). Please round all numerical answers to 2 decimal places.
+
+# Exercise 1
+We will use this dataset to illustrate model-building and the tools for interpreting and comparing models we covered in lectures and labs. While this is far from a complete analysis of this data, these problems show a possible way of exploring various multilevel models of the depression severity outcome.
+
+### Problem 1.1. 
+*Write out the formulas for Model A: the unconditional means model. Build Model A using the `lme` package (you will need to account for missing values in the data using `na.action="na.omit"` in the function call).* 
+
+$$
+Y_{ij} = \pi_{0i} + \epsilon_{ij} \\
+\pi_{0i} = \gamma_{00} + \zeta_{0i} \\
+\epsilon_{ij} \sim \mathcal{N}(0, \sigma^{2}_{\epsilon})  \\
+\zeta_{0i} \sim \mathcal{N}(0, \sigma^{2}_{0})  \\
+$$
+
+```{r warning=FALSE,message=FALSE,error=FALSE}
+rm(list=ls())
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(nlme)
+library(pander)
+
+DF <- read.csv("./depression_hw4.csv") %>% 
+    mutate(Time=Period-1, Endogenous=Depression=="Endogenous")
+
+modelA <- lme(
+    fixed = HamD ~ 1,
+    random = reStruct(~ 1 | Subject, pdClass="pdSymm"),
+    method="ML", data = DF, na.action=na.omit)
+
+gamma00A <- round(summary(modelA)$coefficients$fixed[[1]], 2)
+sigmaeA2 <- round(as.numeric(VarCorr(modelA)["Residual", "Variance"]), 2)
+sigma0A2 <- round(as.numeric(VarCorr(modelA)["(Intercept)", "Variance"]), 2)
+```
+
+*How much of the variation in depression severity score is attributed to differences between individuals? Fill in the table below for the parameters estimated in this model: report the parameter estimate from Model A and a concise interpretation of the parameter estimate.*
+
+| **Parameter Symbol** 	| **Estimated Value** 	| **Concise Interpretation** 	|
+|---------------------	|----------------------------------------	|-----------------------------------------------------------------------------------	|
+| $\gamma_{00}$ 	| `r gamma00A` 	| The population mean of HamD scores across time.|
+| $\sigma_0^2$ 	| `r sigma0A2` | The variance of the mean of individuals HamD scores. |
+| $\sigma_\varepsilon^2$ 	| `r sigmaeA2` 	| The residual individual variance after accounting for an individuals mean.|
+
+### Problem 1.2 
+*Write out the formulas for Model B: the unconditional growth model. Build Model B using the `lme` package. Compare the estimated residual variance in this model to the estimated residual variance in Model A and explain this difference in the context of the problem. What does it tell us about how much total variation in depression severity is explained by the linear effect of time?*
+
+$$
+Y_{ij} = \pi_{0i} + \pi_{0i} TIME_{ij} + \epsilon_{ij} \\
+\pi_{0i} = \gamma_{00} + \zeta_{0i} \\
+\pi_{1i} = \gamma_{10} + \zeta_{1i} \\
+\epsilon_{ij} \sim \mathcal{N}(0, \sigma^{2}_{\epsilon})  \\
+$$
+
+$$
+\
+\begin{bmatrix}
+   \zeta_{0i} \\
+   \zeta_{1i} \\
+\end{bmatrix} 
+\
+\sim \mathcal{N} \Bigg(
+\
+\begin{bmatrix}
+   0 \\
+   0 \\
+\end{bmatrix} 
+\
+,
+\begin{bmatrix}
+   \sigma_0^2 & \sigma_{01} \\
+   \sigma_{01} & \sigma_1^2 \\
+\end{bmatrix} 
+\
+\Bigg)
+$$
+
+```{r}
+modelB <- lme(
+    fixed = HamD ~ 1 + Time,
+    random = reStruct(~ 1 + Time | Subject, pdClass="pdSymm"),
+    method="ML", data = DF, na.action=na.omit)
+
+sigma0B2 <- round(as.numeric(VarCorr(modelB)["(Intercept)", "Variance"]), 2)
+sigma1B2 <- round(as.numeric(VarCorr(modelB)["Time", "Variance"]), 2)
+sigmaeB2 <- round(as.numeric(VarCorr(modelB)["Residual", "Variance"]), 2)
+
+varAssTime <- round((1 - (sigmaeB2 / sigmaeA2)) * 100, 2)
+
+```
+
+When we compare model A residual variance (`r sigmaeA2`) with model B
+(`r sigmaeB2`) we see that `r varAssTime`% of variation in HamD scores is 
+associated with time. 
+
+
+### Problem 1.3.
+*Create a table (using `pander`) of the likelihood ratio test and AIC and BIC values for Models A-B. Comment on the differences in these values and argue one model is preferable over the other.*
+
+```{r}
+anova(modelA, modelB) %>% as.data.frame %>% select(-call) %>% pander
+```
+
+Model B is by all measures presented, AIC, BIC, logLik, and L.Ratio, a better fit to our data. For AIC and BIC we need to make sure we are fitting the model using the same data and using MLE, which we are, in order to definitely say that the model with the lower score is of better fit.
+
+
+### Problem 1.4. 
+*Write out the formulas for Model C: a multi-level model with random slopes and intercepts and fixed effects for Depression Type. Write out the model in composite form as well. Build Model C using the `lme` package. Fill in the table below for the parameters estimated in this model.*
+
+$$
+Y_{ij} = \pi_{0i} + \pi_{0i} TIME_{ij} + \epsilon_{ij} \\
+\pi_{0i} = \gamma_{00} + \gamma_{01} Endogenous + \zeta_{0i} \\
+\pi_{1i} = \gamma_{10} + \gamma_{11} Endogenous + \zeta_{1i} \\
+\epsilon_{ij} \sim \mathcal{N}(0, \sigma^{2}_{\epsilon})  \\
+$$
+
+$$
+\
+\begin{bmatrix}
+   \zeta_{0i} \\
+   \zeta_{1i} \\
+\end{bmatrix} 
+\
+\sim \mathcal{N} \Bigg(
+\
+\begin{bmatrix}
+   0 \\
+   0 \\
+\end{bmatrix} 
+\
+,
+\begin{bmatrix}
+   \sigma_0^2 & \sigma_{01} \\
+   \sigma_{01} & \sigma_1^2 \\
+\end{bmatrix} 
+\
+\Bigg)
+$$
+
+```{r}
+modelC <- lme(
+    fixed = HamD ~ 1 + Time * Endogenous,
+    random = reStruct(~ 1 + Time | Subject, pdClass="pdSymm"),
+    method="ML", data = DF, na.action=na.omit)
+
+gamma00C <- summary(modelC)$coefficients$fixed[["(Intercept)"]] %>% round(2)
+gamma01C <- summary(modelC)$coefficients$fixed[["EndogenousTRUE"]] %>% round(2)
+gamma10C <- summary(modelC)$coefficients$fixed[["Time"]] %>% round(2)
+gamma11C <- summary(modelC)$coefficients$fixed[["Time:EndogenousTRUE"]] %>% 
+    round(2)
+sigma0C2 <- round(as.numeric(VarCorr(modelC)["(Intercept)", "Variance"]), 2)
+sigma1C2 <- round(as.numeric(VarCorr(modelC)["Time", "Variance"]), 2)
+sigmaeC2 <- round(as.numeric(VarCorr(modelC)["Residual", "Variance"]), 2)
+```
+
+| **Parameter Symbol** 	| **Estimated Value** 	| **Concise Interpretation** 	|
+|---------------------	|----------------------------------------	|-----------------------------------------------------------------------------------	|
+| $\gamma_{00}$ 	| `r gamma00C` | The population average HamD score at Period 1 for non-endogenous type depression. |
+| $\gamma_{01}$ 	| `r gamma01C` | The population average HamD score at Period 1 for endogenous type depression. |
+| $\gamma_{10}$ 	| `r gamma10C` | The change in HamD score with a unit change in time for non-endogenous type. |
+| $\gamma_{11}$ 	| `r gamma11C` | The change in HamD score with a unit change in time for endogenous type. |
+| $\sigma_0^2$ 	    | `r sigma0C2` | The population variance of the intercept after accounting for endogeneity. |
+| $\sigma_1^2$ 	    | `r sigma1C2` | The population variance of the slope (effect on time) after accounting for endogeneity. |
+| $\sigma_\epsilon^2$|`r sigmaeC2` | The residual variance of an individual after accounty for their person specific slope and intercept.|
+
+
+### Problem 1.5
+*Examine the differences in the variance components between Models B and C. Which part of the model has experienced the greatest reduction in variance due to the inclusion of the Depression Type variable? By what percentage?*
+
+```{R}
+deltaIntVarCB <- round((1 - (sigma0C2 / sigma0B2)) * 100, 2)
+```
+
+The change in the Intercept variance has had the greatest reducation in the model with the inclusion of the depression type variable. The reduction in variance with its inclusion is `r deltaIntVarCB`%.
+
+
+*Is there a fixed effect estimated in Model C that is significantly different from 0 at the 5% significance level? At the 10% significance level? Interpret the results of the hypothesis tests on fixed effects in the context of the problem?*
+
+At the 5% significance level we can reject the hypothesis that intercept($\gamma_{00}$), that is the value of HamD of the non-endogenous population at Period 1 , is equal to 0. At the same level we can reject the hypothesis that a one unit increase in time has no significant change in dpression score for the non-endogenous population, that is $\gamma_{01} \neq 0$. At the 10% significance level we can reject the hpothesis that at Period 1 the endogenous and non-endogenous populations had the same average HamD score, that is $\gamma_{10} \neq 0$. 
+
+# Exercise 2
+
+### Problem 2.1 
+*Consider Model C once again. Sample 20 random subjects (setting the random seed in R to 1818). For the sampled subjects, show a plot investigating the linearity of their temporal trends at the individual level. Comment briefly if this assumption is valid.*
+
+```{r}
+set.seed(1818)
+# Now you can sample subjects
+
+sampleIDs <- sample(unique(DF$Subject), 20, FALSE)
+
+suppressWarnings(print(
+    DF %>% filter(Subject %in% sampleIDs) %>%
+        ggplot(aes(x=Period, y=HamD, color=Endogenous)) + geom_point() + 
+        geom_smooth(method="lm", se=FALSE) +
+        facet_wrap(~Subject) + 
+        labs(title="Linear Model Trajectories of Depression")))
+```
+
+Plotting level 1 growth model estimates for a subset of our dataset seems to show that a linear model is appropriate for our modeling purposes. In addition, because there is at most 4 time points per individual anything more complicated than a linear model would likely over fit the data. 
+
+### Problem 2.2
+*Calculate the level-1 residuals (those that account for each individual's deviation from their subject-specific multilevel linear model). Investigate their normality and potential heteroscedasticity with regard to subject, type of depression and gender. (You may need to change the subject id from a `numeric` to a `factor` variable.) Comment on whether there seem to be any issues meeting the assumptions of the multilevel model.*
+
+```{R}
+residDF <- DF %>%
+    filter(!is.na(HamD)) %>%
+    mutate(residual=c(residuals(modelC)), predict=c(predict(modelC)),
+           Theoretical=qqnorm(residual, plot.it=FALSE)$x)
+
+ggplot(data=residDF, aes(x=Theoretical, y=residual)) + geom_point() + 
+    labs(y="Residual", title="QQplot")
+ggplot(data=residDF, aes(x=Theoretical, y=residual, color=Sex)) + 
+    geom_point(alpha=.5) + labs(y="Residual", title="QQplot by Sex")
+ggplot(data=residDF, aes(x=Theoretical, y=residual, color=Endogenous)) + 
+    geom_point(alpha=.5) + labs(y="Residual", title="QQplot by Endogeniety")
+ggplot(data=residDF, aes(x=as.numeric(as.factor(Subject)), y=residual)) + 
+    geom_point(alpha=.5) + 
+    labs(y="Residual", x="Subject", title="Residuals Across Subjects")
+```
+
+There does not appear to be any problems of heteroscedasticity of level 1 errors by any of the grouping variables as evidenced by the qqplots and the errors by subject plot.
+
+### Problem 2.3 
+*Investigate the normality of the level-2 residuals and check on potential heteroscedasticity with regard to subject, type of depression and gender. Comment on whether there seem to be any issues meeting the assumptions of the multilevel model.*
+
+```{R}
+level2DF <- ranef(modelC) %>% 
+    mutate(Subject0=1:nrow(.), Subject=as.integer(row.names(.))) %>%
+    mutate(`(Intercept)`=`(Intercept)`/sd(`(Intercept)`), 
+           Time=Time/sd(Time)) %>%
+    gather(key=Effect, value=estimate, `(Intercept)`, `Time`) %>%
+    # make the values for the effect type more English-y
+    mutate(Effect=ifelse(Effect=="(Intercept)","Intercept","Slope")) %>%
+    left_join(DF %>% select(Subject, Sex, Endogenous) %>% unique(), "Subject")
+    
+level2DF <- mutate(level2DF, Theoretical=c(sapply(c("Intercept", "Slope"), function(z)
+        ((level2DF %>% filter(Effect == z))[,"estimate"] %>% qqnorm(plot.it=F))$x)))
+
+ggplot(level2DF, aes(x=Theoretical, y=estimate)) + geom_point() + 
+    geom_abline(slope=1, intercept=0) + facet_grid(~Effect) + 
+    labs(y="Standardized Level 2 Errors", title="Level 2 QQplot")
+
+ggplot(level2DF, aes(x=Theoretical, y=estimate, color=Sex)) + geom_point() + 
+    geom_abline(slope=1, intercept=0) + facet_grid(~Effect) + 
+    labs(y="Standardized Level 2 Errors", title="Level 2 QQplot by Sex")
+
+ggplot(level2DF, aes(x=Theoretical, y=estimate, color=Endogenous)) + geom_point() + 
+    geom_abline(slope=1, intercept=0) + facet_grid(~Effect) + 
+    labs(y="Standardized Level 2 Errors", title="Level 2 QQplot by Endogeniety")
+
+ggplot(level2DF, aes(x=Subject0, y=estimate)) + geom_point() + 
+    geom_abline(slope=0, intercept=0) + facet_grid(~Effect) + 
+    labs(y="Standardized Level 2 Errors", title="Level 2 Errors Across Subjects",
+         x="Subject")
+```
+
+There does not appear to be any problems of heteroscedasticity of level 2 errors by any of the grouping variables as evidenced by the qqplots and the errors by subject plot.
+
+
+### Problem 2.4 
+*Plugging in appropriate covariate values, write out the formulas the population trajectory for subjects with endogenous depression and for subjects with nonendogenous depression.*
+
+For Endogenous ...
+$$
+HamD_{j} = 19.38 - 2.26 Time_j
+$$
+
+For Non-Endogenous ...
+$$
+HamD_{j} = 16.93 - 1.94Time_j
+$$
+
+### Problem 2.5 
+*Plot the estimated population trajectories for subjects with endogenous and nonendogenous depression for the sampled subjects.*
+
+```{R}
+DFfitlevel0 <- DF %>% select(Time, Endogenous) %>% unique %>%
+    mutate(., predictions=predict(modelC, newdata=., level=0), HamD=predictions)
+
+DF %>% filter(!is.na(HamD) & Subject %in% sampleIDs) %>%
+ggplot(aes(x=Time, y=HamD, color=Endogenous)) +
+    geom_point() +
+    geom_line(data=DFfitlevel0, stat="smooth", 
+              aes(x=Time, y=HamD, group=Endogenous, color=Endogenous), 
+              method="lm", size=3, alpha=.5) +
+    ggtitle("Population Linear fit for Sample Subjects") +
+    theme_classic() +
+    ylim(c(0, 40))
+```
