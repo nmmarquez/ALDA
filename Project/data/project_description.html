@@ -139,6 +139,7 @@ $(document).ready(function () {
 </div>
 <div id="random-sample-plot" class="section level2">
 <h2>Random Sample Plot</h2>
+<p>The preliminary plots do look as though there is a difference in the change over time between admission rates of hispanic students by demographics of high school.</p>
 <pre class="r"><code>library(ggplot2)
 hisp_subset &lt;- read.csv(&quot;./subset_data.csv&quot;)
 ggplot(hisp_subset, aes(x=year, y=uc_addmitted/count, color=demo_comp)) + 

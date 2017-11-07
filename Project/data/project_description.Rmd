@@ -18,6 +18,9 @@ Data is collected on 705 individual schools for years between 1994-2015. Not all
 
 
 ## Random Sample Plot
+
+The preliminary plots do look as though there is a difference in the change over time between admission rates of hispanic students by demographics of high school.
+
 ```{r warning=F}
 library(ggplot2)
 hisp_subset <- read.csv("./subset_data.csv")
