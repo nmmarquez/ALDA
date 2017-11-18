@@ -1,0 +1,443 @@
+---
+title: 'Lab 6: Simulating from Models'
+author: "Max Schneider"
+date: "November 7, 2017"
+output:
+    html_document:
+        toc: true
+        theme: cosmo
+        highlight: haddock
+        number_sections: true
+---
+
+```{r loadLibraries, warning=FALSE, message=FALSE}
+# load useful libraries for this lab
+rm(list=ls())
+library(MASS) # used for mvrnorm function
+library(tidyr)
+library(dplyr)
+library(nlme)
+library(ggplot2)
+options(digits=3) # keep the printed output narrow
+```
+
+# Introduction
+
+The level-1 and level-2 model structure we assume provides a framework for simulating data. The general idea is that, by assuming our original model represents the process that generated our observed data, we can simulate a new set of data. Since the model has randomness built in (those random effects and random residual errors), our simulated dataset will certainly be different from the original one; we can then fit the model to this and compute new parameter estimates. Simulations can be useful for a number of reasons:
+
+* **Learning**: we can improve our understanding of the model structure and assumptions.
+* **Model checking**: we can visually examine if simulated trajectories look like observed trajectories.
+* **Estimator properties**: we can simulate data under particular assumptions, compute model estimates, and repeat many times to study the properties of our estimators.
+* **Uncertainty**: we can generate predicted distributions of possible trajectories and observations to quantify uncertainty under the model assumptions.
+
+# Simulating new data
+
+We will examine the `wages` dataset introduced in Lecture 8. We wanted to understand the effects of race (the variable `black`) and education level (the variable `hgc.9`) on the trajectory of high school dropouts' wages (transformed here by the natural logarithm: the variable `lnw`). The time metric here (the variable `exper`) in experience in the labor market, in decimal years, and is both variably spaced and had varying number of measurement occasions per subject. So the dataset is somewhat complex but likely closer to what many of you will see in your own work.
+
+The two-level Model C given in Lecture 8 looked like this:
+
+* $\log(\text{wages})_{ij} = \log(Y_{ij}) = \pi_{0i}+ \pi_{1i} \cdot (\text{exper}_{ij}) + \varepsilon_{ij}$
+* $\pi_{0i} = \gamma_{00} + \gamma_{01} \cdot (\text{hgc.9}_i) + \zeta_{0i}$
+* $\pi_{1i} = \gamma_{10} + \gamma_{11} \cdot (\text{black}_i) + \zeta_{1i}$
+* $\varepsilon_{ij} \sim N(0, \sigma_\varepsilon^2)$
+* $\left[ \begin{array}{c} \zeta_{0i} \\ \zeta_{1i} \end{array} \right] \sim N\left( \left[ \begin{array}{c} 0 \\ 0 \end{array} \right], \left[ \begin{array}{cc} \sigma_0^2 & \sigma_{01} \\ \sigma_{01} & \sigma_1^2 \end{array} \right] \right)$
+
+Written in composite form, the model looks like:
+
+$$\log(Y_{ij}) = \underbrace{[\gamma_{00} + \gamma_{01} \cdot (\text{hgc.9}_i) + \gamma_{10} \cdot (\text{exper}_{ij}) + \gamma_{11} \cdot (\text{black}_i) \cdot (\text{exper}_{ij})]}_{\text{population mean, fixed}} + \underbrace{[\zeta_{0i} + \zeta_{1i} \cdot (\text{exper}_{ij})]}_{\text{subject randomness}}+ \underbrace{\varepsilon_{ij}}_{\text{residual error}}$$
+
+Recall that in a log-linear model, each estimated $\hat{\gamma}$ is interpreted as the $100(\exp(\hat{\gamma}) - 1)$ percentage change in the $Y$ variable per unit difference in the corresponding covariate, with all other variables held constant. For example, $\hat{\gamma}_{01} = 0.1$ means that, everything else constant, a 1 year increase in education corresponds to a `r round(100*(exp(0.1) - 1), 2)`% increase in one's random intercept in a linear trajectory of wages, or one's starting wage value at time zero.
+
+```{r importAlc, warning=FALSE, message=FALSE}
+# change the path for your own computer!
+wages <- read.table("./wages_lab6.csv",
+                 header=TRUE,
+                 sep=",")
+mod <- lme(fixed= lnw ~ 1 + exper + exper:black + hgc.9,
+            random= ~ 1 + exper | id,
+            data=wages,
+            method="ML")
+summary(mod)
+```
+
+Now suppose we were to do another study and hold all the characteristics of the subjects the same. We would have the same number of subjects, same measurement occasions, folks of the same race and educational background, etc. Conceptually, we replace subject 1 with a different person who is a lot like subject 1, subject 2 with a different person who is a lot like subject 2, etc. Of course, we can't usually re-run a study on real subjects, but we sure can in a virtual laboratory on our computers.
+
+Under our model:
+
+* The fixed effects part of the model predicting the new subjects' $Y_{ij}$ values stays the same as the old subjects'. This is determined only by population estimates for the $\gamma$ and subject-specific characteristics.
+* The random effects part of the model predicting the new subjects' $Y_{ij}$ values change. Each subject gets new values of $\zeta_{0i}$, $\zeta_{1i}$, and $\epsilon_{ij}$ for each time $j$. We assume these are drawn from the normal distributions whose variances we estimated when fitting the model.
+
+## Extracting variance parameter estimates
+
+To start, let's grab the estimates for our three variance components: use `VarCorr` to find the estimated residual variance and `getVarCov` for the variance matrix for the random effects, $\zeta_{0i}$ and $\zeta_{1i}$.
+
+```{r saveParams}
+# get the residual standard deviation
+sigma_epsilon <- as.numeric(VarCorr(mod)["Residual","StdDev"])
+
+# can use the getVarCov function to get the
+# random effects covariance matrix for zetas
+varcov_matrix <- getVarCov(mod)
+varcov_matrix
+
+# NOTE: you can also make a matrix in R manually using the matrix command, e.g.
+# example_matrix <- matrix(c(5, 0.5,
+#                            0.5, 2),
+#                          ncol=2,
+#                          byrow=TRUE)
+# (you may need to do this for your homework)
+```
+
+## Calculating population fixed effects
+
+We'll make a new data frame called `sim_data` for our new simulated subjects. We simply use the `predict` function at the population level (`level=0`) to get the means of our predicted fixed effects: $\hat{\gamma}_{00}$, $\hat{\gamma}_{01}$, $\hat{\gamma}_{10}$ and $\hat{\gamma}_{11}$. These are the predicted effects at the population level, without factoring in subject-specific random effects.
+
+```{r setFixedEffects}
+# get fixed effect population predictions
+# for each subject at each time
+sim_data <- wages %>%
+    mutate(fixed_pred=predict(mod, newdata=., level=0))
+```
+
+## Generating multivariate normal random effects
+
+Now, we want to generate new random effects for each subject:
+$$\left[ \begin{array}{c} \zeta_{0i} \\ \zeta_{1i} \end{array} \right] \sim N\left( \left[ \begin{array}{c} 0 \\ 0 \end{array} \right], \left[ \begin{array}{cc} \sigma_0^2 & \sigma_{01} \\ \sigma_{01} & \sigma_1^2 \end{array} \right] \right).$$
+
+Some points to keep in mind:
+
+* We'll usually want to set a "seed" using `set.seed` so that when we generate random numbers, we can do so in a reproducible way. It can be hard to figure out what's going on if every time you re-run part of your code, you generate completely new numbers.
+* We'll use the `mvrnorm` function in the `MASS` library to generate multivariate normal distributions from the random effects distribution above, but using our estimated values of $\sigma_0^2$, $\sigma_1^2$, and $\sigma_{01}$. If we were working with a model with just random intercepts, we don't need a multivariate normal distribution and can just use `rnorm` to get univariate normal draws.
+* We want one set of random effects per subject that will apply at all time points. First we'll want to work with data with one row per subject. Later, we will use `dplyr` to merge it onto our full data that has one row per subject per observation time.
+
+```{r setRandomEffects}
+# setting a seed means you'll get the same "random" results each time
+set.seed(20171107)
+
+# now generate random effects for each subject using mod's estimates:
+RE_sim <- mvrnorm(n=length(unique(sim_data$id)),
+                  mu=c(0,0),
+                  Sigma=varcov_matrix)
+head(RE_sim)
+# this used the names we had from varcov_matrix, so replace them
+colnames(RE_sim) <- c("zeta_0i","zeta_1i")
+
+# convert to a data frame instead of a matrix and add on subject id
+RE_sim <- data.frame(RE_sim)
+RE_sim$id <- unique(sim_data$id)
+head(RE_sim)
+```
+
+We can visually verify that these new random effects look like they come from a bivariate normal distribution:
+
+```{r plotREs}
+ggplot(data=RE_sim, aes(x=zeta_0i, y=zeta_1i)) +
+    geom_point() +
+    theme_bw()+
+    # using expression to put greek letters in ggplot
+    # zeta['0i'] draws a zeta with 0i in subscript
+    xlab(expression(zeta['0i'])) +
+    ylab(expression(zeta['1i'])) +
+    ggtitle("Simulated random effect values") +
+    # dashed lines at x=0, y=0 to orient us
+    geom_hline(yintercept=0, linetype=2) +
+    geom_vline(xintercept=0, linetype=2)
+```
+
+Once we have new simulated random effects for each subject, we need to merge them onto our long dataset that has one row per subject-period. The `left_join` function in `dplyr` can be used for these kinds of merges:
+
+```{r mergeRandomEffects}
+sim_data <- sim_data %>%
+    left_join(RE_sim, by="id")
+head(sim_data)
+```
+
+Now that we have random effects for each subject, we need to compute how much they adjust the predictions that were based just on fixed effects (the population predictions). Looking back at the composite model, we see that the contribution to respondents' wages coming from the random effects is $\zeta_{0i} + \zeta_{1i} \cdot (\text{exper}_{ij})$. We'll use `mutate` and standard math operations to compute this value.
+
+```{r computeRandomEffects}
+sim_data <- sim_data %>%
+    mutate(random_pred = zeta_0i + zeta_1i * exper)
+head(sim_data)
+```
+
+## Generating observation-level error
+
+We need to generate new values of $\varepsilon_{ij}$ from $N(0,\sigma_\varepsilon^2)$ independently for each subject and timepoint. For this, we can just use the `rnorm` function in base R - we just need to tell it the standard deviation that `mod` estimated from the original data.
+
+```{r generateEpsilon}
+sim_data <- sim_data %>%
+    mutate(epsilon_ij = rnorm(n=nrow(.), mean=0, sd=sigma_epsilon))
+head(sim_data)
+```
+
+## Putting it all together
+
+All that's left to do is combine the components that together make up $\hat{Y}_{ij}$, my predicted log wages for subject $i$ at experience level $j$: the fixed effects, the random effects, and the observation-level error (residual).
+
+```{r combinePredictions}
+sim_data <- sim_data %>%
+    mutate(pred_lnw = fixed_pred + random_pred + epsilon_ij )
+```
+
+# Comparing original and simulated data
+
+Let's do a side-by-side plot of the new data we simulated and the original data. I'm going to take the new data and stack it under the old data using `rbind` after keeping just the columns I need, and make a flag for where the data came from. Then I'll use `ggplot2` with `facet_grid` to split by the data source, for a sample of subjects.
+
+```{r stackData}
+# combine the original datasets and simulated data
+# just want to keep id, the time variable, and outcome variable
+# the outcome will be called log_wages and I rename old variables
+# to get it in the dplyr::select statement
+stacked_data <- rbind( wages %>%
+                           dplyr::select(id, exper, log_wages=lnw) %>%
+                           mutate(Source="Original"),
+                       sim_data %>%
+                           dplyr::select(id, exper, log_wages=pred_lnw) %>%
+                           mutate(Source="Simulated") )
+
+# I only want to look at those subjects with at least 3 measurements
+table_ids <- as.data.frame(table(stacked_data$id))
+subjects_to_keep <- table_ids$Var1[table_ids$Freq >=6]
+sample_subjects <- sample(subjects_to_keep, size=20)
+
+# Plot subjects' wage trajectories for original and simulated data
+ggplot(data=stacked_data %>% filter(id %in% sample_subjects),
+       aes(x=exper, y=log_wages, color=Source)) +
+    geom_line(alpha=0.7) +
+    facet_wrap( ~ id, ncol=4) +
+    xlab("Experience Level (in Years)") +
+    ylab("Log(Hourly Wages (in 1990 dollars))") +
+    ggtitle("Comparison of original and simulated wage trajectories") +
+    theme_bw() 
+```
+
+How does the simulated dataset based on the fitted mixed model compare to the original dataset? In what ways do they appear similar?
+
+## Practice
+Plot a few samples of 20 and identify 10 subjects where the simulation was very far off from the original trajectory. Look into the original data for these subjects. Are there similarities between those subjects in our covariates? What might this tell us about whether the proposed model satisfies its underlying assumptions?
+
+# Running multiple simulations with functions
+
+Now that we've made one simulated dataset, we can write a function to generate many more. Some possible uses of repeated simulations include:
+
+* Plotting trajectories for a handful of simulated datasets to visualize the spectrum of assumed data variability. That is, what is the variety of trajectories that our model can produce?
+* Repeatedly simulating data, fitting a model, and storing parameter estimates to study properties of the estimation method. For example, how unbiased, asymptotically normal and consistent are our estimates, actually?
+
+For example, we can treat the fitted parameter estimates we're working with as the **truth**, generate data under these assumptions, estimate fixed effects, do this 100 times, and compare these to the "true" fixed effects we assumed. This assumption (that the given model represents the true data generating process) underlies any simulation from a model.
+
+```{R}
+wages %>% filter(id %in% c(9969, 2361, 1755, 1743, 9076, 4427, 10386)) %>% summary
+```
+
+```{R}
+wages %>% filter(!(id %in% c(9969, 2361, 1755, 1743, 9076, 4427, 10386))) %>% summary
+```
+
+```{R}
+library(reshape2)
+head(stacked_data)
+
+worst_rmse <- stacked_data %>%
+    dcast(id + exper ~ Source, value.var='log_wages') %>%
+    mutate(sqdiff=(Original - Simulated)**2) %>%
+    group_by(id) %>% summarize(rmse=mean(sqdiff)**2) %>%
+    arrange(-rmse) %>% head(10)
+
+wages %>% filter(id %in% worst_rmse$id) %>% summary
+```
+
+```{R}
+wages %>% filter(!(id %in% worst_rmse$id)) %>% summary
+```
+
+## Making a function in R
+
+I'm going to take the code we used to generate our data, clean it up a bit and consolidate it into a custom R function. I'll then call this function 100 times. Each time we call the function, we'll get a new dataset, and I'll fit a model to it and store the fixed effects.
+
+```{r simNewDataFunc}
+# function: simulate_new_data
+# inputs:
+# - cov_input_data = data set with covariate values we want to simulate at
+# - model = fitted lme model
+# defaults to the wages data, model C (Lecture 8)
+# output: cov_input_data with the simulated outcome value (Outcome)
+
+simulate_new_data <- function(cov_input_data=wages,
+                              model=mod) {
+    # find sigma_epsilon first
+    sig_eps <- as.numeric(VarCorr(model)["Residual","StdDev"])
+        
+    # calculate the contribution of fixed effects to the simulated Outcome
+    sim_data <- cov_input_data %>%
+        mutate(fixed_pred=predict(model, newdata=., level=0))
+    
+    # simulate random effects
+    sim_RE <- mvrnorm(n=length(unique(cov_input_data$id)),
+                  mu=c(0,0),
+                  Sigma=getVarCov(model))
+    colnames(sim_RE) <- c("zeta_0i","zeta_1i")
+    sim_RE <- data.frame(sim_RE)
+    sim_RE$id <- unique(cov_input_data$id)
+    
+    sim_data <- sim_data %>%
+        # merge on random effects
+        left_join(sim_RE, by="id") %>%
+        # calculate the contribution of random effects to the simulated Outcome
+        mutate(random_pred = zeta_0i + zeta_1i * exper) %>%
+        # calculate the contribution of residual error to the simulated Outcome
+        mutate(epsilon_ij = rnorm(n=nrow(.), mean=0, sd=sig_eps)) %>%
+        # combine everything into the Outcome
+        mutate(Outcome = fixed_pred + random_pred + epsilon_ij)
+}
+```
+
+The function I wrote called `simulate_new_data` takes as input a data frame of covariates and a fitted model to extract effects from. It returns a data frame with sampled outcome values for each subject and time.
+
+## For loops
+
+I will use `simulate_new_data` 100 times in a `for` loop, fit model C to the simulated data, and store the fixed effects each iteration. This will take a little bit to run, and longer if I do it more than 100 times (which you usually want when doing this for real). Since this takes a while, I'm using the option `cache=TRUE` in my chunk in the R Markdown file so that I don't have to wait for it to re-run each time I knit my file unless I make changes to that chunk.
+
+```{r run100sims, cache=TRUE}
+# generate many simulated datasets, compute fixed effects
+# we will use a "for" loop to do this
+# I will make a dataframe to store the values from each simulation
+
+# number of simulations = number of rows to store
+num_sims <- 100
+# values to store for the simulation: fixed effects
+values_to_store <- names(fixef(mod))
+sim_stored_FEs <- data.frame(matrix(nrow=num_sims,
+                                    ncol=length(values_to_store)))
+colnames(sim_stored_FEs) <- values_to_store
+
+# use a "for" loop to repeat the simulations using my function:
+for(iteration in 1:num_sims) {
+    # generate sample data
+  
+    temp_data <- simulate_new_data(cov_input_data=wages,
+                                   model=mod)
+    head(temp_data, 10)
+    # fit model C to the new data
+    # sometimes we might get data that is hard to fit and gives errors
+    # so I'm increasing the iterations allowed for convergence
+    temp_mod <- lme(fixed= Outcome ~ exper + exper:black + hgc.9,
+                      data=temp_data,
+                      random= ~ 1 + exper | id,
+                      method="ML",
+                      control=lmeControl(maxIter=500,
+                                         msMaxIter=500,
+                                         msMaxEval=500,
+                                         sing.tol=1e-20))
+    # grab the fixed effects for this model fit to these simulated data
+    # store these in the data frame in the row for that iteration
+    # the column names are all the same so I can store all at once
+    sim_stored_FEs[iteration,] <- fixef(temp_mod)
+}
+```
+
+## Analyzing results from a simulation
+
+Having now built 100 models run on 100 different simulated datasets, we can visualize the distributions of their fixed effect estimates. (I could also use the various summary measures we learned earlier using `dplyr` and `summarize` if I wanted to make tables.)
+
+I will make histograms of the fixed effects estimated over the simulations and highlight the "true" estimates of the fixed effects in yellow (the ones we got from fitting model C to the original data), and the empirical averages of those estimates over the simulated iterations in purple.
+
+```{r examineFixEf, warning=FALSE, message=FALSE}
+head(sim_stored_FEs)
+
+# look at distributions of the fixed effects:
+# reshape from wide to long with tidyr
+sim_stored_FEs_long <- sim_stored_FEs %>%
+    gather(Parameter, Value)
+# same for the "true" values from model C fit to original data
+fixed_true_mod <- data.frame(fixef(mod)) %>%
+    mutate(Parameter=rownames(.),
+           Value=fixef.mod.,
+           mean_type="Original") %>%
+    dplyr::select(-fixef.mod.)
+# also for each fixed effect parameter, calculate the mean of its estimates
+# across all iterations of the simulation
+mean_sim_FEs <- sim_stored_FEs_long %>%
+    group_by(Parameter) %>%
+    summarize(Value=mean(Value)) %>%
+    mutate(mean_type="Simulated")
+
+# combine true fixed effects, mean during simulation
+true_and_sim_mean <- rbind(fixed_true_mod,
+                           mean_sim_FEs)
+
+# histograms of each fixed effect
+ggplot(data=sim_stored_FEs_long, aes(x=Value)) +
+    geom_histogram(fill="gray60") +
+    # split by parameter, don't need the same x axis so let it be free
+    facet_wrap(~Parameter, scales="free_x", ncol=2) +
+    theme_bw() +
+    ggtitle("Histograms of fixed effect estimates over 100 simulations") +
+    # vertical lines at means
+    geom_vline(data=true_and_sim_mean,
+               aes(xintercept=Value,
+                   color=mean_type,
+                   linetype=mean_type),
+               size=1.5, alpha=0.75) +
+    xlab("Fitted value during simulation") +
+    ylab("Count") +
+    scale_color_manual(name="Mean type",
+                       values=c("mediumorchid4","darkgoldenrod1")) +
+    scale_linetype_manual(name="Mean type", values=c(2,1))
+```
+
+**Discuss:**
+
+* Where do the "true" fixed effects fall relative to the mean of the ones estimated from models fit to the simulated data?
+* What kind of distribution do the fixed effect estimates appear to have?
+* What do these two observations illustrate about the distribution of fixed effect estimates relative to the true fixed effects when using maximum likelihood estimation?
+
+# Using simulations to convey uncertainty
+
+Another way we can use these simulations is to focus on specific subject characteristics and generate many repetitions of possible trajectories under the model. Let's look at subjects whose educational background is near the average (`hgc.9`=`r mean(wages$hgc.9)`, let's call that 0) and who are black (`black`=1). We can simulate 100 trajectories for them from this model and plot them along with the population trend and some trajectories from the actual data.
+
+```{r simulateSpecific, eval=TRUE}
+# let's take 100 draws for subjects with black=1 and hgc.9=0
+# make dummy subject ids 1 through 100
+sample_subjs <- expand.grid(id=1:100,
+                            black=1,
+                            hgc.9=0,
+                            exper=quantile(wages$exper, probs=seq(0,1,0.1)))
+head(sample_subjs)
+black_edu_avg_sim <- simulate_new_data(cov_input_data=sample_subjs)
+
+# extract subjects just like that one from the real data
+black_edu_avg_real <- wages %>%
+    filter(black==1 & hgc.9 == 0) %>%
+    # add on population average for their values
+    mutate(fitted = predict(mod, newdata=., level=0))
+
+ggplot(data=black_edu_avg_sim, aes(x=exper, y=Outcome, group=id)) +
+    # the simulated lines
+    geom_line(aes(color="Simulated subjects",
+                  size="Simulated subjects"),
+              alpha=0.5) +
+    # the observed lines (take a sample of 5 at a time) -- uses data= to change source
+    geom_line(data=black_edu_avg_real %>% filter(id %in% sample(unique(black_edu_avg_real$id), 5)),
+              aes(y=lnw,
+                  color="Observed subjects",
+                  size="Observed subjects")) +
+    # population average -- also data= to change source
+    geom_line(data=black_edu_avg_real,
+              aes(y=fitted,
+                  color="Population fit",
+                  size="Population fit")) +
+    theme_bw() +
+    ylab("Log(Hourly Wages (in 1990 dollars))") +
+    xlab("Experience Level (in Years)") +
+    ggtitle("Simulated and observed wage trajectories\nfor black respondents with average educational background") +
+    scale_color_manual(name="Source",
+                       values=c("dodgerblue1","firebrick","black")) +
+    scale_size_manual(name="Source",
+                      values=c(2,3,0.5)) +
+    theme(legend.position="bottom")
+```
+
+## Practice
+Take a few more samples of 5 subjects to compare the uncertainty of the simulated predicted trajectories to the trajectories in the original data. Do the simulated trajectories look like the ones we saw in the original data?
+
+Try repeating this for white respondents. Do we see the same trends.
