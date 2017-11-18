@@ -1,0 +1,265 @@
+---
+title: "Homework 5"
+author: 
+date: "Due: Tues, 11/21/2017"
+output: html_document
+---
+
+# Exercise 1 
+
+In this exercise, we will use `unemployment_pp.csv`, the depression and unemployment dataset discussed in lectures and Lab 7. We will model the trajectory of depression (measured on the CES-D scale) as a linear function of time-varying unemployment status and the interaction between time and unemployment status. In our multilevel model, we will have random intercepts and a random slope for the interaction between time and unemployment, but only a fixed effect for the unemployment status. (This is the "simpler model" discussed at the end of Lab 7 - see the updated Lab 7 sheet on Canvas.)
+
+### Problem 1.1 
+
+```{R warning=FALSE,message=FALSE,error=FALSE}
+rm(list=ls())
+library(nlme)
+library(tidyverse)
+library(parallel)
+library(pander)
+library(mvtnorm)
+library(ggplot2)
+set.seed(123)
+```
+
+*Write out this model in both two-level and composite forms. Fit this model to the unemployment data.*
+
+\begin{aligned}
+\text{Two Level Form} \\
+\log (Y_{ij}) = & ~ \pi_{0i} + \gamma_{10} \cdot (\text{unemployed}_{ij}) + 
+               \pi_{2i} \cdot (\text{unemployed}_{ij} \cdot 
+               \text{time}_{ij}) + \varepsilon_{ij}\\ 
+\pi_{0i} = & ~ \gamma_{00} + \zeta_{0i} \\
+\pi_{2i} = & ~ \gamma_{20} + \zeta_{2i} \\
+
+\text{Composite Form} \\
+\log(Y_{ij}) = & ~\gamma_{00} + \gamma_{10} \cdot (\text{unemployed}_{ij}) + 
+               \gamma_{20} \cdot (\text{unemployed}_{ij} \cdot 
+               \text{time}_{ij}) + \\
+               & ~\zeta_{0i} + \zeta_{2i} \cdot 
+               (\text{unemployed}_{ij} \cdot \text{time}_{ij}) +
+               \varepsilon_{ij} \\
+
+\text{Variance Params} \\
+\varepsilon_{ij} \sim_{iid} & ~ \mathcal{N}(0, \sigma_{\varepsilon}) \\
+\end{aligned}
+
+$$
+\
+\begin{bmatrix}
+   \zeta_{0i} \\
+   \zeta_{2i} \\
+\end{bmatrix} 
+\
+\sim \mathcal{N} \Bigg(
+\
+\begin{bmatrix}
+   0 \\
+   0 \\
+\end{bmatrix} 
+\
+,
+\begin{bmatrix}
+   \sigma_0^2 & \sigma_{02} \\
+   \sigma_{02} & \sigma_2^2 \\
+\end{bmatrix} 
+\
+\Bigg)
+$$
+
+```{R SimpleModel}
+unemployment <- read.table("./unemployment_pp.csv", header=TRUE, sep=",")
+
+simpler_model <- lme(fixed= cesd ~ 1 + unemp + unemp:months,
+                     data=unemployment, random= ~ 1 + unemp:months | id)
+summary(simpler_model)
+```
+
+*What proportion of the total variability in depression outcomes can be explained by the variation in each of the three variance components? Report this out in a (nicely-formatted) table.*
+
+#### Proportion of Variance Explained
+
+```{R SimpleVarianceExplained}
+var_explained <- VarCorr(simpler_model)[,1] %>% 
+    as.numeric %>% `/`(var(unemployment$cesd)) %>% round(4)
+names(var_explained) <- c("Intercept", "unemp:months", "Residual")
+pander(var_explained)
+```
+
+### Problem 1.2 
+
+*Write a function to simulate outcome data from this model. The function takes as inputs the original data frame and model object and needs to*
+
+* *obtain the structural part of the model*
+* *obtain the random part of the model, using the distribution estimated in Problem 1.1*
+* *obtain the residual error part of the model, using the $\sigma_{\epsilon}^2$ estimated in Problem 1.1*
+* *combine the above components to calculate the simulated outcome value*
+* *return the original data frame with **only one** extra column for the simulated outcomes.*
+
+```{R simulate_obs}
+
+simulate_obs <- function(DF, model=simpler_model){
+    ## obtain the structural part of the model
+    sim_data <- DF %>%
+        mutate(fixed_pred=predict(model, newdata=., level=0))
+    
+    ## obtain residual error
+    sigma_epsilon <- model$sigma
+    sim_data <- sim_data %>% 
+        mutate(resid_err=rnorm(nrow(.), sd=sigma_epsilon))
+    
+    ## obtain the random part of the model and simulate
+    re_vcov <- model %>% getVarCov %>% unclass
+    RE_sim <- rmvnorm(n=length(unique(sim_data$id)), sigma=re_vcov) %>%
+        as.data.frame %>% 
+        setNames(c("zeta_0i", "zeta_2i")) %>%
+        mutate(id=unique(sim_data$id))
+    
+    ## combine all the parts
+    sim_data_pred <- sim_data %>%
+        left_join(RE_sim, by="id") %>%
+        mutate(ran_pred=zeta_0i + zeta_2i*unemp*months) %>%
+        mutate(pred=ran_pred + fixed_pred + resid_err)
+    
+    ## return the preds with just the one extra column
+    sim_data_pred %>% select(c(names(DF), "pred"))
+}
+```
+
+### Problem 1.3
+
+*We want to understand the effect that re-employment had on depression, using both simulated and observed data. We will consider two archetypes in the next few problems:* 
+
+* *archetype 1: subjects who remained unemployed (pattern "1, 1, 1" in variable `unemp`)* 
+* *archetype 2: subjects who started unemployed but became and stayed employed in the subsequent time points (pattern "1, 0, 0" in variable `unemp`). *
+
+*Generate 1000 individuals from archetypes 1 and 2 (use the same seed and code format below for the time points) and simulate depression data for them with your function from Problem 1.2. Calculate the difference in depression scores at the 3rd time points between those in archetypes 1 and 2. Do this vector-wise to generate 1000 such differences.*
+
+*Hint: one easy way to pull out the nth value of, say, the `unemp` variable for each subject in the unemployment data is `unemployment %>% group_by(id) %>% summarize(nth_msmt = nth(unemp, n))`.*
+
+```{R archetypes_simulate}
+set.seed("823547")
+sample_subjs_archetype1 <- rbind(expand.grid(id=1:1000,
+                            unemp=1,
+                            months=quantile(unemployment$months, 0.2)),
+                      expand.grid(id=1:1000,
+                            unemp=1,
+                            months=quantile(unemployment$months, 0.5)),
+                      expand.grid(id=1:1000,
+                            unemp=1,
+                            months=quantile(unemployment$months, 0.8))) %>%
+    mutate(archetype=1)
+
+# Now generate 1000 individuals from archetype 2...
+sample_subjs_archetype2 <- rbind(expand.grid(id=1:1000,
+                            unemp=1,
+                            months=quantile(unemployment$months, 0.2)),
+                      expand.grid(id=1:1000,
+                            unemp=0,
+                            months=quantile(unemployment$months, 0.5)),
+                      expand.grid(id=1:1000,
+                            unemp=0,
+                            months=quantile(unemployment$months, 0.8))) %>%
+    mutate(archetype=2)
+
+archs_simulated <- rbind(
+    sample_subjs_archetype1 %>% simulate_obs %>% 
+        group_by(id) %>% summarize_all(function(y) nth(y, n=3)),
+    sample_subjs_archetype2 %>% simulate_obs %>% 
+        group_by(id) %>% summarize_all(function(y) nth(y, n=3)))
+
+arch_diff <- archs_simulated %>% 
+    select(id, archetype, pred) %>%
+    spread(archetype, pred) %>% 
+    mutate(diff=`2` - `1`)
+```
+
+### Problem 1.4
+
+*Extract out from the real data subjects in archetypes 1 and 2. How many of each archetype do we have? What is the difference in the average depression score at the 3rd time point between the two archetypes? Interpret this value.*
+
+```{R archetpes_observed}
+arch1_ids <- intersect(
+    unemployment %>% group_by(id) %>% 
+    summarize(second=nth(unemp, 2)) %>%
+    filter(second==1) %>% select(id),
+    unemployment %>% group_by(id) %>% 
+    summarize(third=nth(unemp, 3)) %>%
+    filter(third==1) %>% select(id)) %>% unlist
+
+arch2_ids <- intersect(
+    unemployment %>% group_by(id) %>% 
+    summarize(second=nth(unemp, 2)) %>%
+    filter(second==0) %>% select(id),
+    unemployment %>% group_by(id) %>% 
+    summarize(third=nth(unemp, 3)) %>%
+    filter(third==0) %>% select(id)) %>% unlist
+
+# sanity check these results
+filter(unemployment, id %in% arch1_ids) %>% select(unemp) %>%
+    unlist %>% set_names(NULL) %>% all.equal(.,rep(1, length(.)))
+
+filter(unemployment, id %in% arch2_ids) %>% arrange(id, months) %>%
+    select(unemp) %>% unlist %>% set_names(NULL) %>% 
+    all.equal(., rep(c(1,0,0), length(.)/3))
+
+third_time_cesd_arch1 <- filter(unemployment, id %in% arch1_ids) %>%
+    group_by(id) %>% summarize(cesd3=nth(cesd,3)) %>%
+    select(cesd3) %>% unlist %>% mean
+
+third_time_cesd_arch2 <- filter(unemployment, id %in% arch2_ids) %>%
+    group_by(id) %>% summarize(cesd3=nth(cesd,3)) %>%
+    select(cesd3) %>% unlist %>% mean
+
+obs_3rd_diff <- third_time_cesd_arch2 - third_time_cesd_arch1
+sim_3rd_diff <- mean(arch_diff$diff)
+```
+### Problem 1.5 
+
+*Plot a histogram of the 1000 simulated differences calculated in Problem 1.3. Comment on the shape of this distribution. *
+
+*Calculate the mean difference and generate an approximate 95% confidence interval for the true difference in depression corresponding to maintaining employment, among the simulated subjects (use the `quantile` function). Interpret the mean and confidence interval. Based on your simulations, does maintaining employment over time result in a change in depression at the 3rd time point? Why or why not? How does this compare with your result in Problem 1.4?*
+
+```{R analyze_diff_results}
+ggplot(data=arch_diff, aes(x=diff)) + geom_histogram(bins=30) + 
+     geom_vline(aes(xintercept=mean(diff, na.rm=T)),
+               color="red", linetype="dashed", size=1) +
+    labs(title="Simulated Differnces Between Archetypes at Time 3",
+         x="Predict CESD for Archetype 2 - Archetype 1")
+
+diffCI <- quantile(arch_diff$diff, c(.025, .975))
+pander(diffCI)
+```
+
+# Exercise 2 
+
+Here, we return to our dataset on depression severity of patients and consider growth models with different orders of the time variable.
+
+### Problem 2.1
+
+*Using dataset `depression_hw5.csv`, explore a subset of 8 individual trajectories of depression severity scores, with subject IDs 120, 319, 339, 346, 351, 353, 604, and 606. Is there some support for curve-linear functional forms of the individual trajectories?*
+
+### Problem 2.2 
+
+*Starting with the unconditional growth model, develop a taxonomy of models by adding the quadratic and cubic time components and associated random effects (e.g., see Table 6.5 in Singer and Willett). Build the following models*
+
+* *Unconditional growth*
+* *Linear growth model*
+* *Quadratic growth model*
+* *Cubic growth model*
+
+*You will need to adjust some of the `lmeControl` options to get some of these models to get fit to the data. Please report what you adjusted and for which model(s).*
+
+### Problem 2.3
+
+*Write a taxonomy of the models built in Problem 2.2. Create a nicely-formatted table similar to Table 6.5 in Singer and Willett to describe the parameters in the models and the estimates you obtained.*
+
+### Problem 2.4 
+
+*Compare the models in the taxonomy using the appropriate metrics and considerations of the fitting process. Report the results of the model comparison in a nicely-formatted table.* 
+
+*Describe the best fitting model. Interpret the fixed effects estimates (do not print the model summary). Is there evidence for curve-linear functional form of the mean depression score trajectory across all individuals in the study?*
+
+### Problem 2.5
+
+*Make a plot of the mean predicted trajectory (using your preferred model) and overlay 9 predicted individual trajectories for subject IDs in Problem 2.1. Comment on the functional form of the mean depression score trajectory and of the individual fitted trajectories.*

@@ -1,0 +1,188 @@
+---
+title: "Dealing with computational issues"
+author: "Max Schneider"
+date: "11/8/2017"
+output:
+    html_document:
+        toc: true
+        theme: cosmo
+        highlight: haddock
+        number_sections: true
+---
+
+```{r loadLibraries, warning=FALSE, message=FALSE}
+library(nlme)
+options(digits=3) # keep the printed output narrow
+```
+
+# Introduction
+
+In today's lab, we'll be looking at an example of a model we saw in class for the unemployment and depression data. Recall the data: the depression levels of unemployed folks were tracked at three variably-spaced measurement occassions (time metric: decimal months). The trajectory of depression was modelled over time, using unemployment status as a time-variable predictor. A taxonomy of multilevel models was built for this. Your Singer and Willett textbook discusses the final model reached on page 173 ("Model D") and Elena has it in her Lecture 9 slides (slides 26-29).
+
+**Level 1:**
+
+* $\text{depression}_{ij} = \pi_{0i} + \pi_{2i} \cdot \text{unemployed}_{ij} + \pi_{3i} \cdot \text{unemployed}_{ij} \cdot \text{time}_{ij} + \varepsilon_{ij}$
+* $\varepsilon_{ij} \sim N(0, \sigma_\varepsilon^2)$
+
+**Level 2:**
+
+* $\pi_{0i} = \gamma_{00} + \zeta_{0i}$
+* $\pi_{2i} = \gamma_{20} + \zeta_{2i}$
+* $\pi_{3i} = \gamma_{30} + \zeta_{3i}$
+* $\left[ \begin{array}{c} \zeta_{0i} \\ \zeta_{2i} \\ \zeta_{3i} \end{array} \right] \sim N \left( \left[ \begin{array}{c} 0 \\ 0 \\ 0 \end{array} \right], \left[ \begin{array}{ccc} \sigma_0^2 & \sigma_{02} & \sigma_{03} \\ \sigma_{02} & \sigma_2^2 & \sigma_{23} \\ \sigma_{03} & \sigma_{23} & \sigma_3^2 \end{array} \right] \right)$
+
+
+
+The composite form of this model is as follows:
+$$\log(Y_{ij}) = \underbrace{[\gamma_{00} + \gamma_{20} \cdot (\text{unemployed}_{ij}) + \gamma_{30} \cdot (\text{unemployed}_{ij} \cdot \text{time}_{ij})]}_{\text{population mean, fixed}} + \underbrace{[\zeta_{0i} + \zeta_{2i} \cdot (\text{unemployed}_{ij}) + \zeta_{3i} \cdot (\text{unemployed}_{ij} \cdot \text{time}_{ij})]}_{\text{subject randomness}}+ \underbrace{\varepsilon_{ij}}_{\text{residual error}}$$
+
+By not including a main effect for time, we have constrained the effect of time on depression for employed individuals to be zero, and the only variation we'll model comes from random intercepts and residual error. The subject-specific depression trend for individuals employed throughout the study is simply modeled by the flat trajectory $\gamma_{00} + \zeta_{0i}$. Though everyone starting the study was unemployed so this trend can't apply to anybody real in the data, it makes sense that among a group counterfactually employed throughout the whole period, we don't think their average depression trajectories will trend up or down.
+
+For unemployed subjects, depression is modeled by a linear trend over time. We have subject-specific intercepts $\gamma_{00} + \zeta_{0i}$, subject-specific effect of unemployment estimates $\gamma_{20} +  \zeta_{2i}$, and subject-specific slopes $\gamma_{30} + \zeta_{3i}$. The random intercepts, unemployment effects, and slopes are correlated.
+
+# First attempt to fitting the model
+
+Let's try to fit this model using `lme`.
+
+```{r attempt1, cache=TRUE, error=TRUE}
+# change the path for your own computer!
+unemployment <- read.table("~/Documents/!PhD-UW/CSSS-594/ALDA/unemployment_pp.csv",
+                       header=TRUE,
+                       sep=",")
+head(unemployment, 10)
+
+# How many observations per subject?
+length(unique(unemployment$id))
+table(table(unemployment$id))
+
+# Let's build Model D
+attempt_1 <- lme(fixed= cesd ~ 1 + unemp*months,
+                  data=unemployment,
+                  random= ~ 1 + unemp*months | id,
+                  method="ML")
+```
+
+The data aren't huge (only `r nrow(unemployment)` observations total), but this took a long time to run, which was a warning sign that things are not going to turn out good for us. [Note: I had to add the chunk options `error=TRUE` to each chunk in my R Markdown file   where I show an error below to get this document to compile.]
+
+I realize I've made a mistake: I was fitting a model with too many terms. This warning message is a clue:
+
+```
+Warning in lme.formula(fixed = cesd ~ 1 + unemp * months, data = unemployment,  :
+  fewer observations than random effects in all level 1 groups
+```
+
+I only have 1-3 observations per subject, but the model I'm fitting has four random effects and four fixed effects. It is mathematically impossible to estimate four random effects per subject when each only had three data points! I will fix this by being more careful about leaving out the main effect of time in both the fixed and random parts of the model. Here, I use the `:` notation to denote inclusion of an interaction effect without a corresponding main effect, both in the fixed and random model specifications.
+
+```{r attempt2, cache=TRUE, error=TRUE}
+attempt_2 <- lme(fixed= cesd ~ 1 + unemp + unemp:months,
+                  data=unemployment,
+                  random= ~ 1 + unemp + unemp:months | id,
+                  method="ML")
+```
+
+We now no longer get a warning about having too many random effects, but this is still not converging. The error is `iteration limit reached without convergence (10)`.
+
+We will now dig under the hood of the `lme` function, in particular the iterative optimization algorithm this function uses to estimate our parameters. The options that control this algorithm lie in the `lmeControl` command.
+
+# Trying to up the iterations
+
+A natural next attempt to fix this is to increase the number of iterations using `lmeControl`. The default `maxIter` is 50 iterations, so we'll up this to 500.
+
+```{r attempt3, cache=TRUE, error=TRUE}
+attempt_3 <- lme(fixed= cesd ~ 1 + unemp + unemp:months,
+                  data=unemployment,
+                  random= ~ 1 + unemp + unemp:months | id,
+                  method="ML",
+                 control = lmeControl(maxIter=500))
+```
+
+# Peeking more closely at iterations
+
+That didn't work, so we'll use another option called `msVerbose` that may help us troubleshoot the issue. This function prints out the iteration number, the value of the likelihood it's trying to optimize, and the estimates of all parameters the algorithm has calculated at each iteration. We can say `msVerbose=TRUE` to print out every iteration, `msVerbose=5` to print out every 5th iteration, etc.
+
+```{r attempt4, cache=TRUE, error=TRUE}
+attempt_4 <- lme(fixed= cesd ~ 1 + unemp + unemp:months,
+                  data=unemployment,
+                  random= ~ 1 + unemp + unemp:months | id,
+                  method="ML",
+                 control = lmeControl(maxIter=500,
+                                      msVerbose=TRUE))
+```
+
+This quit after 50 iterations, so the problem wasn't enough `maxIter`. It turns out when looking at `?lmeControl` help that there is another set of iterations we can alter called `msMaxIter`, which is the number of iterations nested inside each iteration controlled by `maxIter`. Its default is 50, so we'll bump that up too. Let's have a look at every fifth iteration's output.
+
+```{r attempt5, cache=TRUE, error=TRUE}
+attempt_5 <- lme(fixed= cesd ~ 1 + unemp + unemp:months,
+                  data=unemployment,
+                  random= ~ 1 + unemp + unemp:months | id,
+                  method="ML",
+                 control = lmeControl(maxIter=500,
+                                      msMaxIter=500,
+                                      msVerbose=5))
+```
+
+This gave up after about $160<500$ iterations, so we haven't run out of iterations. Increasing `msMaxIter` definitely helped because the error code message is (9) this time, and not (10), so something else is amiss.
+
+# Increasing function evaluations
+
+The error message suggests that the "function evaluation limit" is the culprit now. The function being referred to is the likelihood function (the objective function) that is being optimized in each of the 160 iterations that ran before. In each iteration that `lme` runs, a subcommand (called `nlminb`) tries to optimize the likelihood function, again in an iterative way. We can see in the help pages for `lmeControl` that there's an `msMaxEval` option that controls the maximum number of evaluations of the objective function. 
+
+## Practice
+Use the help page `?lmeControl` to find the default of the `msMaxEval` option. Try raising this higher (by 50 or 100) until you get another error message, numbered (7).
+
+```{r attempt6, cache=TRUE, error=TRUE, eval=FALSE}
+attempt_6 <- lme(fixed= cesd ~ 1 + unemp + unemp:months,
+                  data=unemployment,
+                  random= ~ 1 + unemp + unemp:months | id,
+                  method="ML",
+                 control = lmeControl(maxIter=500,
+                                      msMaxIter=500,
+                                      msMaxEval=ms_max_eval_value,
+                                      msVerbose=10))
+```
+
+# Singular covariance matrices
+
+What does "singular" mean? Recall that our random effects are coming from a multivariate normal distribution with covariance matrix $\Sigma$. A primary goal of building htese models is to find (to estimate) that $\Sigma$.
+
+Not just any old matrix will work as a covariance matrix! For one, it must be symmetric because covariance is a symmetric function in that $\text{cov}(\sigma_0, \sigma_1)=\text{cov}(\sigma_1, \sigma_0)$. It must also be what is called *positive definite*. This is a restriction that's analogous to saying that the matrix has a valid (non-imaginary) square root. If you think about just variance $\sigma^2$ in one dimension, that quantity is always non-negative and has a valid square root (i.e. the standard deviation $\sigma$). Positive definite is how we generalize being square-rootable to more dimensions.
+
+This means the space of possible covariance matrices is restricted in a complicated geometric way. A problem we can encounter as our iterations approach the edges of this space is called *singularity*. This is when the matrix becomes degenerate (e.g. a correlation term $\rho(\sigma_0, \sigma_1)$ is very close to $\pm 1$). It is a common problem when we have many parameters and few data points.
+
+Looking at the output, it looks like we should be getting close to convergence. The values in most columns have gotten close together between interations, which is how numerical routines check for convergence. Our problem appears to be that the covariance matrix `lme` is estimating is becoming singular enough that `lme` is giving up. By following the R help for `?lmeControl` to `?nlminb`, we learn there is a control option called `sing.tol` whose default value is `1e-10` ($10^{-10}$). We can try making this value even smaller so that R does not give up as early as it does declaring the matrix as singular and throwing up error (7). We will try `1e-20` ($10^{-20}$), which is about as precisely as we can do any numerical operations on standard computers.
+
+```{r attempt7, cache=TRUE, error=TRUE}
+attempt_7 <- lme(fixed= cesd ~ 1 + unemp + unemp:months,
+                  data=unemployment,
+                  random= ~ 1 + unemp + unemp:months | id,
+                  method="ML",
+                 control = lmeControl(maxIter=500,
+                                      msMaxIter=500,
+                                      msMaxEval=500,
+                                      sing.tol=1e-20, # 1e-10
+                                      msVerbose=10))
+```
+
+# Scrutinizing our fitted model
+
+This worked! We reached convergence in about 260 iterations.
+
+```{r}
+summary(attempt_7)
+```
+
+Having tortured `lme` to get this result, though, should we be satisfied with this? A major concern is that the correlation between unemployment status and unemployment interacted with time is `r as.numeric(VarCorr(attempt_7)["unemp:months",4])`. This is very close to -1, so it's not surprising that we had difficulties with a singular covariance matrix. The matrix is no longer too singular for `lme` because we gave it a stricter definition of what singular meant with `sing.tol`, but it's still essentially singular.
+
+Though the authors of your textbook uncritically use these fitted values for Model D (and don't report the negative correlation in the table on page 163), you should not be so willing to accept these estimates. The strong negative correlation is a signal that we have too many parameters in the model relative to the size of our data. Recall that parsimony, generally speaking, is a goal of model-building.
+
+One alternative is to drop the random effect of unemployment. That is, we keep the random intercepts and random slope for unemployed subjects, but we don't model subject differences in the effect of unemployment on baseline depression. This is essentially absorbing the unemployment random effect into the random intercept, which will make the random intercept more variable than before.
+
+```{r attempt8, cache=TRUE, error=TRUE}
+simpler_model <- lme(fixed= cesd ~ 1 + unemp + unemp:months,
+data=unemployment,
+random= ~ 1 + unemp:months | id,
+method="REML")
+summary(simpler_model)
+```
+
+Our fixed effect estimates are very close to those obtained from the tortured Model D, but the random effect parameter estimates are not degenerate. We didn't need to do anything special in `lmeControl` to get this simpler model to fit. We've paid a penalty in terms of higher residual variance and potentially in how to justify this model specification (see the discussion in Singer and Willett, page 172). But we can be more confident in the validity of the numerical estimates since our covariance matrix isn't on the boundary of the space of possible covariance matrices.
