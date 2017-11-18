@@ -338,6 +338,30 @@ anova(models[[1]], models[[2]], models[[3]], models[[4]]) %>%
 
 *Describe the best fitting model. Interpret the fixed effects estimates (do not print the model summary). Is there evidence for curve-linear functional form of the mean depression score trajectory across all individuals in the study?*
 
+While there is no model which is the best by all criteira the Quadradic model has the lowest AIC and second lowest (behind the linear model) BIC, while also being significantly different in the chi-sqaured test. Looking at the fixed effects the parameters $\gamma_{00}$ (the intercept term) and $\gamma_{10}$ (the linear chnange term) did not drastically change as shown in the table above. In addition the parameter $\gamma_{20}$ (the quadradic term) did not significantly differ
+from zero which indicates that the trajectory of depression scores over periods across all individuals is close to linear.
+
 ### Problem 2.5
 
 *Make a plot of the mean predicted trajectory (using your preferred model) and overlay 9 predicted individual trajectories for subject IDs in Problem 2.1. Comment on the functional form of the mean depression score trajectory and of the individual fitted trajectories.*
+
+```{R trajectories_plotted}
+preds <- depression %>% 
+    mutate(pred_HamD=predict(models[[3]], newdata=., level=1),
+           Type="Subject", LS=1)
+pred_global <- 
+    data.frame(Period=1:4, Period0=0:3, P2=(0:3)^2, P3=(0:3)^3) %>%
+    mutate(pred_HamD=predict(models[[3]], newdata=., level=0),
+           Subject=0, Type="Global", LS=1.1)
+
+
+filter(preds, Subject %in% inspect_subjects) %>% bind_rows(pred_global) %>%
+    ggplot(aes(x=Period, y=pred_HamD, group=Subject, linetype=Type, size=Type)) + 
+    geom_line() + 
+    scale_size_manual(values=c(Global=1.8, Subject=.6),
+                      label=c(Global="Population \nAverage", 
+                              Subject="Subject \nEstimate")) +
+    scale_linetype_discrete(label=c(Global="Population \nAverage", 
+                                    Subject="Subject \nEstimate")) + 
+    labs(x="Period", y="HamD Estimate", title="HamD Estimates Over Time")
+```
