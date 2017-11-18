@@ -239,24 +239,102 @@ Here, we return to our dataset on depression severity of patients and consider g
 
 *Using dataset `depression_hw5.csv`, explore a subset of 8 individual trajectories of depression severity scores, with subject IDs 120, 319, 339, 346, 351, 353, 604, and 606. Is there some support for curve-linear functional forms of the individual trajectories?*
 
+```{R explore_depression}
+depression <- read.table("./depression_hw5.csv", sep=",", header=TRUE) %>%
+    mutate(Period0=Period-1, P2=Period0**2, P3=Period0**3)
+
+inspect_subjects <- c(120, 319, 339, 346, 351, 353, 604, 606)
+
+filter(depression, Subject %in% inspect_subjects & !is.na(HamD)) %>%
+    ggplot(aes(Period, HamD, color=Sex)) + 
+    geom_point() + facet_wrap(~Subject) + 
+    labs(title="HamD Over Periods By Subject ID")
+
+```
+
+A look at the data over time for our subset of samples shows that we have at most two four data points for each period making it heard to argue for more than three parameters to fit each trajectory. There does seem to be some indication of a non-linear fit, however, so at the very least testing a model with three parameters should be done. 
+
 ### Problem 2.2 
 
-*Starting with the unconditional growth model, develop a taxonomy of models by adding the quadratic and cubic time components and associated random effects (e.g., see Table 6.5 in Singer and Willett). Build the following models*
+*Starting with the unconditional means model, develop a taxonomy of models by adding the quadratic and cubic time components and associated random effects (e.g., see Table 6.5 in Singer and Willett). Build the following models*
 
-* *Unconditional growth*
+* *Unconditional means*
 * *Linear growth model*
 * *Quadratic growth model*
 * *Cubic growth model*
 
 *You will need to adjust some of the `lmeControl` options to get some of these models to get fit to the data. Please report what you adjusted and for which model(s).*
 
+```{R model_building}
+models <-list(
+    lme(fixed=HamD ~ 1, data=depression, 
+        random=~1|Subject, na.action=na.omit, method="ML"),
+    lme(fixed=HamD ~ 1 + Period0, data=depression, 
+        random=~1 + Period0|Subject, na.action=na.omit, method="ML"),
+    lme(fixed=HamD ~ 1 + Period0 + P2, data=depression, 
+        random=~1 + Period0 + P2|Subject, na.action=na.omit, method="ML"),
+    lme(fixed=HamD ~ 1 + Period0 + P2 + P3, data=depression, na.action=na.omit,
+        random=~1 + Period0 + P2 + P3|Subject, method="ML",
+        control=lmeControl(maxIter=500,msMaxIter=500,msMaxEval=300)))
+
+sigma2_ep <- sapply(models, function(x) (x$sigma)**2) %>% round(2)
+bc <- lapply(models, function(x) x$coefficients$fixed %>% round(2))
+rv <- lapply(models, function(x) getVarCov(x) %>% diag %>% round(2))
+```
+
+
 ### Problem 2.3
 
 *Write a taxonomy of the models built in Problem 2.2. Create a nicely-formatted table similar to Table 6.5 in Singer and Willett to describe the parameters in the models and the estimates you obtained.*
 
+| Parameter             |  Interpretation            |Unconditional Mean| Linear           | Quadratic        |         Cubic    |
+|-----------------------|----------------------------|------------------|------------------|------------------|------------------|
+| $\gamma_{00}$         |Intercept (Period 1 Status) | `r bc[[1]][[1]]` | `r bc[[2]][[1]]` | `r bc[[3]][[1]]` | `r bc[[4]][[1]]` |
+| $\gamma_{10}$         |Time (linear term)          |                  | `r bc[[2]][[2]]` | `r bc[[3]][[2]]` | `r bc[[4]][[2]]` |
+| $\gamma_{20}$         |Time^2 (quadratic term)     |                  |                  | `r bc[[3]][[3]]` | `r bc[[4]][[3]]` |
+| $\gamma_{30}$         |Time^3 (cubic term)         |                  |                  |                  | `r bc[[4]][[4]]` |
+| $\sigma_{\epsilon}^2$ |Within Individual Error Var.| `r sigma2_ep[1]` | `r sigma2_ep[2]` | `r sigma2_ep[3]` | `r sigma2_ep[4]` |
+| $\sigma_{ii}^2$       |Variance of $\zeta_{i0}$ terms| See Below      |                  |                  |                  |
+| $\sigma_{ij}$         |CoVariance of $\zeta_{i0}$ & $\zeta_{j0}$ terms|  See Below |     |                  |                  |
+
+#### Variance & CoVariance Estimates
+
+##### Unconditional Mean Model
+
+```{R echo=FALSE}
+models[[1]] %>% getVarCov %>% unclass %>% pander
+```
+
+##### Linear Model
+
+```{R echo=FALSE}
+models[[2]] %>% getVarCov %>% unclass %>% pander
+```
+
+##### Quadratic Model
+
+```{R echo=FALSE}
+models[[3]] %>% getVarCov %>% unclass %>% pander
+```
+
+##### Cubic Model
+
+```{R echo=FALSE}
+models[[4]] %>% getVarCov %>% unclass %>% pander
+```
+
 ### Problem 2.4 
 
 *Compare the models in the taxonomy using the appropriate metrics and considerations of the fitting process. Report the results of the model comparison in a nicely-formatted table.* 
+
+```{R model_evaluate}
+anova(models[[1]], models[[2]], models[[3]], models[[4]]) %>% 
+    select(-call) %>% remove_rownames %>%
+    mutate(Model=c("Unconditional Means",
+                   "Linear Model",
+                   "Quadratic Model",
+                   "Cubic Model")) %>% pander
+```
 
 *Describe the best fitting model. Interpret the fixed effects estimates (do not print the model summary). Is there evidence for curve-linear functional form of the mean depression score trajectory across all individuals in the study?*
 
