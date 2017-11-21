@@ -1,6 +1,6 @@
 ---
 title: "Homework 5"
-author: 
+author: "Neal Marquez"
 date: "Due: Tues, 11/21/2017"
 output: html_document
 ---
@@ -82,7 +82,7 @@ summary(simpler_model)
 ```{R SimpleVarianceExplained}
 var_explained <- VarCorr(simpler_model)[,1] %>% 
     as.numeric %>% `/`(var(unemployment$cesd)) %>% round(4)
-names(var_explained) <- c("Intercept", "unemp:months", "Residual")
+names(var_explained) <- c("Intercept", "Unemployment x Months", "Residual")
 pander(var_explained)
 ```
 
@@ -214,6 +214,9 @@ third_time_cesd_arch2 <- filter(unemployment, id %in% arch2_ids) %>%
 obs_3rd_diff <- third_time_cesd_arch2 - third_time_cesd_arch1
 sim_3rd_diff <- mean(arch_diff$diff)
 ```
+
+In our observed dataset we have `r length(arch1_ids)` individuals in the first archetype and `r length(arch2_ids)` individuals of the second archetype. At the third time point observed for each individual the observed difference between the mean of archetype 2 individuals and teh mean of archetype 1 individuals was `r round(obs_3rd_diff, 2)`. It is important to note that individuals in the obsereved set were all observed at different times, time is a continuous and unscheduled variable, while in the simulated data set all individuals were simulated at the same time point. Nevertheless, the value states that at the third time point, on average, we see lower values of HamD depression score for archetype 2 than archetype 1. To ensure that this is a fair comparison we should check that there is not a significant difference in the third time observed between the individuals in archetype 2 and archetype 1.
+
 ### Problem 1.5 
 
 *Plot a histogram of the 1000 simulated differences calculated in Problem 1.3. Comment on the shape of this distribution. *
@@ -230,6 +233,10 @@ ggplot(data=arch_diff, aes(x=diff)) + geom_histogram(bins=30) +
 diffCI <- quantile(arch_diff$diff, c(.025, .975))
 pander(diffCI)
 ```
+
+Above is a histogram of the simulated values for the differnce in HamD scores for the third time observed between archetype 2 and archetype 1 individuals. The shape of the distribution is fairly normal which makes sense since each component of the simulated values is either a fixed scalar value or normal distribution and the product/sum of a scalar and a normal distribution and the sum of normal distributions is also a normal distribution. 
+
+The estimated value of the differnce at the third time point is `r round(sim_3rd_diff, 2)` with confidence interval (`r paste(round(diffCI, 2), collapse=", ")`). The mean value is negative which means that at the third time point simulated individuals of archetype 2 had a lower value of HamD than those in archetype 1, in line with our observed data. The confidence intervals for this value is relatively large and crosses the zero value which indicates that although the simulated differnce is on average negative, that there is a large amount of variablity amongst individuals within each group.
 
 # Exercise 2 
 
@@ -282,10 +289,13 @@ bc <- lapply(models, function(x) x$coefficients$fixed %>% round(2))
 rv <- lapply(models, function(x) getVarCov(x) %>% diag %>% round(2))
 ```
 
+All models fit without alteration except for the cubic model which required increases in the default values of `maxIter`, `maMaxIter`, and `msMaxEval` in order to properly converge.
 
 ### Problem 2.3
 
 *Write a taxonomy of the models built in Problem 2.2. Create a nicely-formatted table similar to Table 6.5 in Singer and Willett to describe the parameters in the models and the estimates you obtained.*
+
+#### Fixed Parameter Estimates
 
 | Parameter             |  Interpretation            |Unconditional Mean| Linear           | Quadratic        |         Cubic    |
 |-----------------------|----------------------------|------------------|------------------|------------------|------------------|
@@ -338,8 +348,7 @@ anova(models[[1]], models[[2]], models[[3]], models[[4]]) %>%
 
 *Describe the best fitting model. Interpret the fixed effects estimates (do not print the model summary). Is there evidence for curve-linear functional form of the mean depression score trajectory across all individuals in the study?*
 
-While there is no model which is the best by all criteira the Quadradic model has the lowest AIC and second lowest (behind the linear model) BIC, while also being significantly different in the chi-sqaured test. Looking at the fixed effects the parameters $\gamma_{00}$ (the intercept term) and $\gamma_{10}$ (the linear chnange term) did not drastically change as shown in the table above. In addition the parameter $\gamma_{20}$ (the quadradic term) did not significantly differ
-from zero which indicates that the trajectory of depression scores over periods across all individuals is close to linear.
+While there is no model which is the best by all criteira the Quadradic model has the lowest AIC and second lowest (behind the linear model) BIC, while also being significantly different in the chi-sqaured test. Looking at the fixed effects the parameters $\gamma_{00}$ (the intercept term) and $\gamma_{10}$ (the linear chnange term) did not drastically change as shown in the table above. In addition the parameter $\gamma_{20}$ (the quadradic term) did not significantly differ from zero which indicates that the trajectory of depression scores over periods across all individuals is close to linear. I would also be wary of selecting the cubic model because of the high colinearity of the fixed parameters and the algorith tweaking that was required in order to have the model converge. 
 
 ### Problem 2.5
 
@@ -365,3 +374,5 @@ filter(preds, Subject %in% inspect_subjects) %>% bind_rows(pred_global) %>%
                                     Subject="Subject \nEstimate")) + 
     labs(x="Period", y="HamD Estimate", title="HamD Estimates Over Time")
 ```
+
+The mean (population) score trajectory appears to be linear in its form, however individuals, more often than not, appear to have a trajetory that is better described by a quadratic fit. 
