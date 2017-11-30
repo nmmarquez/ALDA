@@ -1,0 +1,177 @@
+---
+title: "CSSS 594, Quiz 4"
+author: "Neal MArquez"
+date: "11/22/2017"
+output:
+    html_document:
+    theme: cosmo
+highlight: haddock
+---
+# Instructions
+
+Submit a completed copy of this quiz sheet *BOTH* as a `.Rmd` and `.html` file to Canvas in the Quiz 4 assignment page.
+
+*IMPORTANT!* Most chunks have `eval=FALSE` in the options. Once you have the code in the chunk working, change it to `eval=TRUE`. That way, the results of code that works will be included in your document if you compile as you go along, while results of code that doesn't yet work won't. When you are done with the quiz, all code chunks that part of your answers should have `eval=TRUE`.
+
+# Background
+
+We are returning to the cows data we used at the beginning of the quarter. Cows were fed one of three different diets (barley, lupins, or a mixture of the two). The protein content of milk (percentage of protein in their milk)  were measured each week. In these problems, we will build several models of the cows' protein trajectories and use model selection to examine the effect of adding covariates, treating time in different ways and considering the groupings that exist within this dataset.
+
+The code below will read in the data and plot all trajectories to remind you about the data.
+
+```{r load, warning=FALSE, message=FALSE, eval=TRUE}
+# Make sure you have these libraries installed on your computer so they load in properly!
+rm(list=ls())
+library(dplyr) 
+library(ggplot2)
+library(nlme)
+library(lcmm)
+options(digits=3) # keep the printed output narrow
+
+# change directories to your own computer
+milk_long <- read.table("./milk_long.csv",
+                       header=TRUE,
+                       sep=",")
+
+```
+    
+```{r}
+ggplot(data=milk_long, aes(x=Week, y=Protein, group=Cow, color=Diet)) +
+    geom_line(alpha=0.5) +
+    facet_grid( Diet ~ .) +
+    theme_bw() +
+    ggtitle("Observed cow protein trajectories")
+```
+   
+# Question 1
+*We will fit the following two-level linear mixed model to the milk data*:
+
+* $\text{Protein}_{ij} = \pi_{0i} + \pi_{1i} \cdot \text{Week}_{ij} + \varepsilon_{ij}$
+* $\pi_{0i} = \gamma_{00} + \zeta_{0i}$
+* $\pi_{1i} = \gamma_{10} + \zeta_{1i}$
+* $\varepsilon_{ij} \sim N(0, \sigma_\varepsilon^2)$
+* $\left[ \begin{array}{c} \zeta_{0i} \\ \zeta_{1i} \end{array} \right] \sim N\left( \left[ \begin{array}{c} 0 \\ 0 \end{array} \right], \left[ \begin{array}{cc} \sigma_0^2 & \sigma_{01} \\ \sigma_{01} & \sigma_1^2 \end{array} \right]\right)$
+
+*Fill in the call to the `lme` command below to successfully create the model `milk_linear1` and print its summary.* 
+```{r question2, eval=TRUE}
+milk_linear1 <- lme(Protein ~ 1 + Week, data=milk_long,
+                    random= ~ 1 + Week | Cow, method="ML")
+summary(milk_linear1)
+```
+
+# Question 2
+
+*We will then fit the following two-level linear mixed model to the milk data*:
+
+* $\text{Protein}_{ij} = \pi_{0i} + \pi_{1i} \cdot \text{Week}_{ij} + \varepsilon_{ij}$
+* $\pi_{0i} = \gamma_{00} + \gamma_{01} \cdot \text{I(Diet=Lupins)}_i + \gamma_{02} \cdot \text{I(Diet=Mixed)}_i + \zeta_{0i}$
+* $\pi_{1i} = \gamma_{10} + \gamma_{11} \cdot \text{I(Diet=Lupins)}_i + \gamma_{12} \cdot \text{I(Diet=Mixed)}_i + \zeta_{1i}$
+* $\varepsilon_{ij} \sim N(0, \sigma_\varepsilon^2)$
+* $\left[ \begin{array}{c} \zeta_{0i} \\ \zeta_{1i} \end{array} \right] \sim N\left( \left[ \begin{array}{c} 0 \\ 0 \end{array} \right], \left[ \begin{array}{cc} \sigma_0^2 & \sigma_{01} \\ \sigma_{01} & \sigma_1^2 \end{array} \right]\right)$
+
+*Fill in the call to the `lme` command below to successfully create the model `milk_linear2` and print its summary.* 
+
+```{r question1, eval=TRUE}
+milk_linear2 <- lme(Protein ~ 1 + Week + Diet + Diet*Week, data=milk_long,
+                    random= ~ 1 + Week | Cow, method="ML")
+summary(milk_linear2)
+```
+
+# Question 3
+
+*What is the interpretation of the estimate of $\gamma_{10}$ in the model `milk_linear1`? Is this the same as the interpretation of the estimate of $\gamma_{10}$ in model `milk_linear2`? If not, what are the differences?*
+
+In `milk_linear1` the parameter $\gamma_{10}$ is the across individual average change in Protein count that is associated with a one unit change in week. This is not the same in the `milk_linear2` model where the interpretation of $\gamma_{10}$ is the across individual average change of Protien count associated with a one unit change in week only for cows with a Barley diet.
+
+# Question 4
+
+*Perform a likelihood ratio test to compare the `milk_linear1` and `milk_linear2` models. Which model does the likelihood ratio test favor, using a $p < 0.05$ cutoff? Interpret this comparison in the context of this study (1-2 sentences).*
+
+```{r question4, eval=TRUE}
+anova(milk_linear1, milk_linear2)
+```
+
+Using a $p < 0.05$ cutoff the anova test favors the `milk_linear2` model over the `milk_linear1` model. In the context of this study this means that the inclusion of indicator variables, in `milk_linear2`, describing an individuals cows diet and how that cows diet intereacts with chnages over time produces a more descriptive explanation of the variance in milk protein levels, even when penalized for the inclusion of more paramters in the model when compared with `milk_linear1`.
+
+# Question 5
+
+*Using your R output from Question 4, compare models `milk_linear1` and `milk_linear2` by the AIC and BIC. Which model is selected by each score? Interpret this comparison in the context of this study (1-2 sentences). Does the fact that AIC and BIC use a different penalty for overfitting make a difference in this case?*
+
+When looking at `AIC` and `BIC` as the selection criteria, `AIC` favors `milk_linear2` while BIC favors `milk_linear1`. This can be interpreted as `AIC` favoring the inclusion of the Diet paramters because it more accurately descirbes the variance of milk protein while BIC states that the model with fewer paramters should be selected because the diet paramters due not have a sufficiently non-zero effect on mil protein outcomes.. 
+
+# Question 6
+
+*Now we fit a model with a quadratic curvilinear form for the population average trajectories as given below:*
+
+* $\text{Protein}_{ij} = \pi_{0i} + \pi_{1i} \cdot \text{Week}_{ij} + \pi_{2i} \cdot \text{Week}_{ij}^2 + \varepsilon_{ij}$
+* $\pi_{0i} = \gamma_{00} + \gamma_{01} \cdot \text{I(Diet=Lupins)}_i + \gamma_{02} \cdot \text{I(Diet=Mixed)}_i + \zeta_{0i}$
+* $\pi_{1i} = \gamma_{10} + \gamma_{11} \cdot \text{I(Diet=Lupins)}_i + \gamma_{12} \cdot \text{I(Diet=Mixed)}_i + \zeta_{1i}$
+* $\pi_{2i} = \gamma_{20} + \gamma_{21} \cdot \text{I(Diet=Lupins)}_i + \gamma_{22} \cdot \text{I(Diet=Mixed)}_i + \zeta_{2i}$
+* $\varepsilon_{ij} \sim N(0, \sigma_\varepsilon^2)$
+* $\left[ \begin{array}{c} \zeta_{0i} \\ \zeta_{1i} \\ \zeta_{2i} \end{array} \right] \sim N\left( \left[ \begin{array}{c} 0 \\ 0 \\0 \end{array} \right], \left[ \begin{array}{ccc} \sigma_0^2 & \sigma_{01} & \sigma_{02} \\ \sigma_{01} & \sigma_1^2 & \sigma_{12} \\ \sigma_{02} & \sigma_{12} & \sigma_2^2  \end{array} \right]\right)$
+
+*Fill in the call to the `lme` command below to successfully create the model `milk_quad_diet` and print its summary.* 
+```{r question6, eval=TRUE}
+milk_long <- milk_long %>% mutate(Week2=Week^2)
+milk_quad_diet <- lme(Protein ~ 1 + Week + Week2 + 
+                          Diet + Diet*Week + Diet*Week2, data=milk_long,
+                    random= ~ 1 + Week + Week2 | Cow, method="ML")
+summary(milk_quad_diet)
+```
+
+# Question 7
+
+*Perform a likelihood ratio test to compare the `milk_linear1`, `milk_linear2` and `milk_quad_diet` models. Which model does the likelihood ratio test favor, using a $p < 0.05$ cutoff? Interpret this comparison in the context of this study (1-2 sentences).*
+
+```{r question7, eval=TRUE}
+# Run one command in R here
+anova(milk_linear1, milk_linear2, milk_quad_diet)
+```
+
+Using a $p < 0.05$ cutoff the likelihood ratio test prefers the `milk_quad_diet` over the other two models. This means that the inclusion of diet parameters that interect with a quadratic fit over time, weeks in our case, better describes the variation in milk proteins observed than a linear model, or a linear model that includes diet and an interaction between diet and linear change over time.
+
+# Question 8
+
+*Now use the `hlme` function introduced in Lab 9 to fit a model that assumes **three latent groups** with each having a **linear trajectory** over time, with no random effects and no covariates. You don't need to specify initial parameter values.*
+
+*Fill in the call to the `hlme` command below to successfully create the model `milk_linear_3` and print its summary.* 
+```{r question10, eval=TRUE}
+milk_linear_3 <- hlme(fixed = Protein ~ Week,
+              subject = "Cow",
+              mixture = ~ Week,
+              ng = 3,
+              data = milk_long)
+summary(milk_linear_3)
+```
+
+# Question 9
+*Use the `hlme` function to fit a model that assumes **three latent groups** with each having a **quadratic trajectory** over time, with no random effects and no covariates. You don't need to specify initial parameter values.*
+
+*Fill in the call to the `hlme` command below to successfully create the model `milk_quad_3` and print its summary.* 
+```{r question11, eval=FALSE}
+milk_quad_3 <- hlme(fixed = Protein ~ Week + Week2,
+              subject = "Cow",
+              mixture = ~ Week + Week2,
+              ng = 3,
+              data = milk_long)
+summary(milk_quad_3)
+```
+
+# Question 10
+
+*For a given group-based trajectory model, the function below produces a table of most likely class numbers for all cows, crossed with those cows' diet. Use the function to generate such a table for the group-based models `milk_linear_3` and `milk_quad_3`. Compare the two models' abilities to discern between the 3 diet groups. Interpret this comparison in the context of this study (1-2 sentences).*
+
+```{r question12, eval=FALSE}
+tabResultsByDietGroup <- function(hlme_model) {
+ return( table( milk_long %>%
+           select(Cow, Diet) %>%
+           left_join(hlme_model$pprob, by="Cow") %>%
+           select(Cow, Diet, class) %>%
+           distinct() %>%
+           select(-Cow) ) ) }
+# Use the above function to generate the tables for the two hlme models
+tabResultsByDietGroup(milk_linear_3)
+tabResultsByDietGroup(milk_quad_3)
+```
+
+For both the `milk_linear_3`and the `milk_quad_3`, the models were more accurately able to classify cows who had a Barley diet based on linear and quadratic changes over time, respectively, in milk protein count compared with cows that have a Lupins or mixed diet. If we intended the model to accurately classify groups of diet based on temporal changes in milk protein, we would likely need to include more covariates to be able to better distinguish between the Lupins and Mixed diet.
