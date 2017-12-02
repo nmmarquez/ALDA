@@ -15,18 +15,25 @@ eligable_files <- list.files("./CAHSData", full.names=TRUE) %>%
 # be more careful
 senior_data_wide <- rbind_list(lapply(senior_files, function(x) 
     read.delim(x, sep="\t") %>% set_names(x=., nm=tolower(names(.))))) %>%
+    mutate(year=sprintf("%04d", year)) %>%
     mutate(Year=as.Date(substring(year, 1, 2), "%y")) %>% select(-year) %>%
     mutate(year=as.numeric(as.character(Year, format="%Y"))) %>% 
-    select(-c(Year)) %>% mutate(school=tolower(school))
+    select(-c(Year)) %>% mutate(school=tolower(school)) %>% 
+    as.data.frame
 
-uc_data <- read_csv("./UCdata/all_uc_data.csv") %>% 
+senior_data_wide %>% select(county, district, school) %>% unique %>% nrow
+senior_data_wide %>% select(county, district, school, cds_code) %>% unique %>% nrow
+
+uc_files <- list.files("./UCdata", full.names=TRUE) %>% 
+    grep("Universitywide", ., value=T)
+uc_data <- bind_rows(lapply(uc_files, read.csv, stringsAsFactors=F)) %>% 
     set_names(x=., nm=tolower(names(.))) %>%
-    mutate(school=tolower(`school name`)) %>% select(-`school name`) %>%
-    rename(county=`county/state/ territory`) %>%
+    mutate(school=tolower(`school.name`)) %>% select(-`school.name`) %>%
+    rename(county=`county.state..territory`) %>%
     mutate(no_match=!(school %in% unique(senior_data_wide$school))) %>%
     mutate(new_school=sub("high school", "high", school)) %>%
     mutate(school=replace(school, no_match, new_school[no_match])) %>%
-    select(-no_match, -new_school, -x1, -calculation1)
+    select(-no_match, -new_school, -x, -calculation1)
 
 senior_data_long_unstruct <- senior_data_wide %>%
     gather(ethnicity, count, am_ind:not_reported)
@@ -35,7 +42,7 @@ senior_data_long <- senior_data_long_unstruct %>% filter(ethnicity=="total") %>%
     select(-ethnicity) %>% rename(total=count) %>% 
     right_join(senior_data_long_unstruct) %>% filter(ethnicity!="total")
 
-### how may rows are we losing to bad data practices? ~ 650
+### how may rows are we losing to bad data practices?
 nrow(senior_data_long %>% filter(!is.na(count) & total < count))
 
 senior_data_long <- senior_data_long %>% filter(is.na(count) | total >= count)
@@ -59,14 +66,28 @@ hisp_data_senior <- senior_data_long %>%
 # This is over counting admissions because some students get in multple places
 # use the all data set later
 hisp_data_uc <- uc_data %>% 
-    filter(`uad uc ethn 6 cat`=="Hispanic/ Latino" & `measure names`=="adm") %>%
+    filter(`uad.uc.ethn.6.cat`=="Hispanic/ Latino" & `measure.names`=="adm") %>%
     group_by(city, county, year, schooltype, school) %>%
-    summarize(uc_addmitted=sum(`measure values`, na.rm=T))
+    summarize(uc_addmitted=sum(`measure.values`, na.rm=T)) %>% as.data.frame
 
-names(hisp_data_senior)
-names(hisp_data_uc)
+# data points in HS data
+select(hisp_data_senior, county, school) %>% unique %>% nrow
+# data points in UC data
+select(hisp_data_uc, county, school) %>% unique %>% nrow
+# data points in joined data
+inner_join((select(hisp_data_senior, county, school) %>% unique %>% mutate(cat1=1)),
+           (select(hisp_data_uc, county, school) %>% unique %>% mutate(cat2=1))) %>%
+    nrow
+
 
 merged_adm_data <- inner_join(hisp_data_senior, hisp_data_uc)
+merged_adm_data <- merged_adm_data %>% select(county, school) %>%
+    unique %>% mutate(., ID=1:nrow(.)) %>% right_join(merged_adm_data) %>%
+    filter(count != 0) %>% mutate(year0=year-min(year))
+
+merged_adm_data[merged_adm_data$uc_addmitted > merged_adm_data$count, "uc_addmitted"] <- 
+    merged_adm_data[merged_adm_data$uc_addmitted > merged_adm_data$count, "count"]
+write.csv(merged_adm_data, "./merged_data.csv", row.names=F)
 
 set.seed(123)
 samp1 <- merged_adm_data %>% 
