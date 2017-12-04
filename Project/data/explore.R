@@ -10,9 +10,7 @@ senior_files <- list.files("./CAHSData", full.names=TRUE) %>%
 eligable_files <- list.files("./CAHSData", full.names=TRUE) %>% 
     grep("elig", ., value=TRUE)
 
-# the way that you are identifying unique observations is different for
-# different parts of the process look at your last select statement here and 
-# be more careful
+# 
 senior_data_wide <- rbind_list(lapply(senior_files, function(x) 
     read.delim(x, sep="\t") %>% set_names(x=., nm=tolower(names(.))))) %>%
     mutate(year=sprintf("%04d", year)) %>%
@@ -63,12 +61,22 @@ senior_data_long <- senior_data_long %>% mutate(demo_comp=as.factor(NA)) %>%
 hisp_data_senior <- senior_data_long %>% 
     filter(ethnicity == "hispanic" & !is.na(count) & !is.na(total))
 
-# This is over counting admissions because some students get in multple places
-# use the all data set later
+#
 hisp_data_uc <- uc_data %>% 
     filter(`uad.uc.ethn.6.cat`=="Hispanic/ Latino" & `measure.names`=="adm") %>%
     group_by(city, county, year, schooltype, school) %>%
     summarize(uc_addmitted=sum(`measure.values`, na.rm=T)) %>% as.data.frame
+
+hisp_data_uc <- uc_data %>% 
+    filter(`uad.uc.ethn.6.cat`=="Hispanic/ Latino" & `measure.names`=="app") %>%
+    group_by(city, county, year, schooltype, school) %>%
+    summarize(uc_applied=sum(`measure.values`, na.rm=T)) %>% as.data.frame %>%
+    select(-schooltype) %>%
+    right_join(hisp_data_uc, by=c("city", "county", "year", "school")) %>%
+    select(-city, -schooltype)
+
+# make sure there isnt any weird records in the uc system
+sum(hisp_data_uc$uc_applied < hisp_data_uc$uc_addmitted)
 
 # data points in HS data
 select(hisp_data_senior, county, school) %>% unique %>% nrow
@@ -85,9 +93,28 @@ merged_adm_data <- merged_adm_data %>% select(county, school) %>%
     unique %>% mutate(., ID=1:nrow(.)) %>% right_join(merged_adm_data) %>%
     filter(count != 0) %>% mutate(year0=year-min(year))
 
-merged_adm_data[merged_adm_data$uc_addmitted > merged_adm_data$count, "uc_addmitted"] <- 
-    merged_adm_data[merged_adm_data$uc_addmitted > merged_adm_data$count, "count"]
+# number of weird records we need to address in the HS data set
+sum(merged_adm_data$uc_applied > merged_adm_data$count)
+
+
+merged_adm_data[merged_adm_data$uc_applied > merged_adm_data$count, "count"] <- 
+    merged_adm_data[merged_adm_data$uc_applied > merged_adm_data$count, "uc_applied"]
+
+# Now we are good
+sum(merged_adm_data$uc_applied > merged_adm_data$count)
+sum(merged_adm_data$uc_addmitted > merged_adm_data$count)
+
 write.csv(merged_adm_data, "./merged_data.csv", row.names=F)
+
+merged_data %>%
+    ggplot(aes(x=count, y=uc_addmitted, color=white_prop)) + geom_point() + 
+    geom_smooth(method="lm", color="red")
+merged_data %>%
+    ggplot(aes(x=count, y=uc_applied, color=white_prop)) + geom_point() + 
+    geom_smooth(method="lm", color="red")
+merged_data %>%
+    ggplot(aes(x=uc_applied, y=uc_addmitted, color=white_prop)) + geom_point() + 
+    geom_smooth(method="lm", color="red")
 
 set.seed(123)
 samp1 <- merged_adm_data %>% 
@@ -105,6 +132,13 @@ sub_merged_data <- rbind(samp1, samp2) %>% mutate(keep=1) %>%
 write_csv(sub_merged_data, "./subset_data.csv")
 
 ggplot(sub_merged_data, aes(x=year, y=uc_addmitted/count, color=demo_comp)) + 
+    geom_point() + 
+    geom_smooth(method="lm", se=F) +
+    facet_wrap(~school) + 
+    labs(title="Linear Model Trajectories of Hispanic Student Admission") + 
+    ylim(0,1)
+
+ggplot(sub_merged_data, aes(x=year, y=uc_addmitted/uc_applied, color=demo_comp)) + 
     geom_point() + 
     geom_smooth(method="lm", se=F) +
     facet_wrap(~school) + 
