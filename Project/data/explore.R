@@ -49,9 +49,16 @@ white_pop <- senior_data_long %>% filter(ethnicity == "white") %>%
     mutate(white_prop=count/total) %>%
     select(-ethnicity, -count, -total)
 
-senior_data_long <- left_join(senior_data_long, white_pop)
+hisp_pop <- senior_data_long %>% filter(ethnicity == "hispanic") %>%
+    mutate(hisp_prop=count/total) %>%
+    select(-ethnicity, -count, -total)
+
+senior_data_long <- left_join(senior_data_long, white_pop) %>%
+    left_join(hisp_pop)
 cor(senior_data_long$white_prop, senior_data_long$count, use="pair")
 cor(senior_data_long$white_prop, senior_data_long$total, use="pair")
+cor(senior_data_long$hisp_prop, senior_data_long$count, use="pair")
+cor(senior_data_long$hisp_prop, senior_data_long$total, use="pair")
 
 senior_data_long <- senior_data_long %>% mutate(demo_comp=as.factor(NA)) %>%
     mutate(demo_comp=ifelse(white_prop > .7, "High White Pop.", NA)) %>%
@@ -106,13 +113,13 @@ sum(merged_adm_data$uc_addmitted > merged_adm_data$count)
 
 write.csv(merged_adm_data, "./merged_data.csv", row.names=F)
 
-merged_data %>%
+merged_adm_data %>%
     ggplot(aes(x=count, y=uc_addmitted, color=white_prop)) + geom_point() + 
     geom_smooth(method="lm", color="red")
-merged_data %>%
+merged_adm_data %>%
     ggplot(aes(x=count, y=uc_applied, color=white_prop)) + geom_point() + 
     geom_smooth(method="lm", color="red")
-merged_data %>%
+merged_adm_data %>%
     ggplot(aes(x=uc_applied, y=uc_addmitted, color=white_prop)) + geom_point() + 
     geom_smooth(method="lm", color="red")
 
@@ -131,16 +138,15 @@ sub_merged_data <- rbind(samp1, samp2) %>% mutate(keep=1) %>%
 
 write_csv(sub_merged_data, "./subset_data.csv")
 
+png("./plots/sample_plot.png", width=600)
 ggplot(sub_merged_data, aes(x=year, y=uc_addmitted/count, color=demo_comp)) + 
     geom_point() + 
     geom_smooth(method="lm", se=F) +
     facet_wrap(~school) + 
-    labs(title="Linear Model Trajectories of Hispanic Student Admission") + 
+    labs(title="Linear Model Trajectories of Hispanic Student Admission",
+         y="Rate of Admission to UC", x="Year") +
+    scale_color_discrete(
+        name="Demography", 
+        labels=c("High White\n(p>.7)", "Low White\n(p<.3)")) +
     ylim(0,1)
-
-ggplot(sub_merged_data, aes(x=year, y=uc_addmitted/uc_applied, color=demo_comp)) + 
-    geom_point() + 
-    geom_smooth(method="lm", se=F) +
-    facet_wrap(~school) + 
-    labs(title="Linear Model Trajectories of Hispanic Student Admission") + 
-    ylim(0,1)
+dev.off()

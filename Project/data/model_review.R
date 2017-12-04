@@ -19,6 +19,7 @@ DF <- DF %>%
            l0residstd = l0resid/sd(l0resid))
 head(DF)
 
+png("./plots/level1_residuals.png", width=600)
 ggplot(data=DF, aes(sample=l1residstd)) +
     stat_qq() +
     theme_bw() +
@@ -27,6 +28,7 @@ ggplot(data=DF, aes(sample=l1residstd)) +
     ggtitle("Q-Q plot of standardized level-1 residuals") +
     # add an identity line y=x to compare equality of distributions
     geom_abline(intercept=0, slope=1)
+dev.off()
 
 png("./plots/temporalresiduals.png", width=600)
 ggplot(data=DF, aes(x=year, y=l1residstd)) +

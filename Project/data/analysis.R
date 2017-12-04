@@ -1,10 +1,11 @@
 rm(list=ls())
-library(dplyr)
 library(lme4)
 library(MASS)
+library(dplyr)
 library(lmtest)
 library(ggplot2)
 library(boot)
+library(knitr)
 
 # load in data and construct some variables important to rescale year for
 # model fitting otherwise we get gradient issues
@@ -45,7 +46,10 @@ lrtest(ranintPois, ranintNB)
 summary(ranPois <- glmer(ffran, data=DF, family=poisson, control=mmCtrl))
 summary(ranNB <- glmer.nb(ffran, data=DF, control=mmCtrl))
 lrtest(ranPois, ranNB)
-lrtest(ranintPois, ranPois)
+anova(ranintNB, simpNB, intactNB, ranNB) %>% as.data.frame %>% 
+    select(-deviance, -`Chi Df`, -logLik) %>% `row.names<-`(paste0("Model", 1:4)) %>% 
+    kable(format="latex")
+    
 
 ## now that we have our main fit lets expand a bit and look at other rates
 summary(ranNBcapp <- glmer.nb(
@@ -63,12 +67,30 @@ summary(ranPappadm <- glmer(
     uc_addmitted ~ white_prop + yearM + (1 + yearM | ID) + white_prop:yearM + 
         offset(log(uc_applied)), data=DF, control=mmCtrl, family=poisson))
 
+## run the same models with hisp_prop as the variable of interest
+summary(hispranNB <- glmer.nb(
+    uc_addmitted ~ hisp_prop + yearM + (1 + yearM | ID) + hisp_prop:yearM + 
+        offset(log(count)), data=DF, control=mmCtrl))
+
+summary(hispranNBcapp <- glmer.nb(
+    uc_applied ~ hisp_prop + yearM + (1 + yearM | ID) + hisp_prop:yearM + 
+        offset(log(count)), data=DF, control=mmCtrl))
+
+summary(hispranPappadm <- glmer(
+    uc_addmitted ~ hisp_prop + yearM + (1 + yearM | ID) + hisp_prop:yearM + 
+        offset(log(uc_applied)), data=DF, control=mmCtrl, family=poisson))
+
 groupPredDF <- expand.grid(year=1994:2015, white_prop=c(.7, .3)) %>%
     mutate(yearM=(year-max(DF$year))/10, uc_applied=1, count=1) %>%
-    mutate(demog=ifelse(white_prop > .5, "High White", "Low White")) %>%
+    mutate(hisp_prop=1-white_prop) %>%
+    mutate(demog=ifelse(hisp_prop > .5, "High Hisp", "Low Hisp")) %>%
+    mutate(demogh=ifelse(white_prop > .5, "High White", "Low White")) %>%
     mutate(predcadm=exp(predict(ranNB, newdata=., re.form=NA))) %>% 
     mutate(predcapp=exp(predict(ranNBcapp, newdata=., re.form=NA))) %>%
-    mutate(predappadm=exp(predict(ranPappadm, newdata=., re.form=NA)))
+    mutate(predappadm=exp(predict(ranPappadm, newdata=., re.form=NA))) %>%
+    mutate(hisppredcadm=exp(predict(hispranNB, newdata=., re.form=NA))) %>% 
+    mutate(hisppredcapp=exp(predict(hispranNBcapp, newdata=., re.form=NA))) %>%
+    mutate(hisppredappadm=exp(predict(hispranPappadm, newdata=., re.form=NA)))
 
 png("./plots/avgpredcadm.png", width=600)
 ggplot(groupPredDF, aes(x=year, y=predcadm*1000, group=demog, color=demog)) + 
@@ -98,6 +120,39 @@ ggplot(groupPredDF, aes(x=year, y=predappadm*1000, group=demog, color=demog)) +
     scale_color_discrete(
         name="Demography", 
         labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
+dev.off()
+
+png("./plots/havgpredcadm.png", width=600)
+ggplot(groupPredDF, aes(x=year, y=hisppredcadm*1000, group=demogh, color=demogh)) + 
+    geom_line() + 
+    labs(x="Year", y="Rate of Senior Students Admitted to UC (per 1000)",
+         title="Total Hispanic Student Rate of Acceptance by School Demography")  + 
+    scale_color_manual(
+        name="Demography", 
+        labels=c("Low Hispanic\n(p=.3)", "High Hispanic\n(p=.7)"),
+        values=c("green", "purple"))
+dev.off()
+
+png("./plots/havgpredcapp.png", width=600)
+ggplot(groupPredDF, aes(x=year, y=hisppredcapp*1000, group=demogh, color=demogh)) + 
+    geom_line() + 
+    labs(x="Year", y="Rate of Students Applying to UC (per 1000)",
+         title="Hispanic Student Rate of Application by School Demography")  + 
+    scale_color_manual(
+        name="Demography", 
+        labels=c("Low Hispanic\n(p=.3)", "High Hispanic\n(p=.7)"),
+        values=c("green", "purple"))
+dev.off()
+
+png("./plots/havgpredappadm.png", width=600)
+ggplot(groupPredDF, aes(x=year, y=hisppredappadm*1000, group=demogh, color=demogh)) + 
+    geom_line() + 
+    labs(x="Year", y="Rate of Applying Students Admitted to UC (per 1000)",
+         title="Applied Hispanic Student Rate of Acceptance by School Demography") + 
+    scale_color_manual(
+        name="Demography", 
+        labels=c("Low Hispanic\n(p=.3)", "High Hispanic\n(p=.7)"),
+        values=c("green", "purple"))
 dev.off()
 
 save(DF, ranNB, ranNBcapp, ranPappadm, file="results.Rdata")

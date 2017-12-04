@@ -1,0 +1,472 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Beamer Presentation
+% LaTeX Template
+% Version 1.0 (10/11/12)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%-------------------------------------------------------------------------------
+%	PACKAGES AND THEMES
+%-------------------------------------------------------------------------------
+
+\documentclass{beamer}
+
+\mode<presentation> {
+
+% The Beamer class comes with a number of default slide themes
+% which change the colors and layouts of slides. Below this is a list
+% of all the themes, uncomment each in turn to see what they look like.
+
+%\usetheme{default}
+%\usetheme{AnnArbor}
+%\usetheme{Antibes}
+%\usetheme{Bergen}
+%\usetheme{Berkeley}
+%\usetheme{Berlin}
+%\usetheme{Boadilla}
+%\usetheme{CambridgeUS}
+%\usetheme{Copenhagen}
+%\usetheme{Darmstadt}
+%\usetheme{Dresden}
+%\usetheme{Frankfurt}
+%\usetheme{Goettingen}
+%\usetheme{Hannover}
+%\usetheme{Ilmenau}
+%\usetheme{JuanLesPins}
+%\usetheme{Luebeck}
+%\usetheme{Madrid}
+%\usetheme{Malmoe}
+%\usetheme{Marburg}
+%\usetheme{Montpellier}
+%\usetheme{PaloAlto}
+%\usetheme{Pittsburgh}
+%\usetheme{Rochester}
+%\usetheme{Singapore}
+%\usetheme{Szeged}
+\usetheme{Warsaw}
+
+% As well as themes, the Beamer class has a number of color themes
+% for any slide theme. Uncomment each of these in turn to see how it
+% changes the colors of your current slide theme.
+
+%\usecolortheme{albatross}
+%\usecolortheme{beaver}
+%\usecolortheme{beetle}
+%\usecolortheme{crane}
+%\usecolortheme{dolphin}
+%\usecolortheme{dove}
+%\usecolortheme{fly}
+%\usecolortheme{lily}
+\usecolortheme{orchid}
+%\usecolortheme{rose}
+%\usecolortheme{seagull}
+%\usecolortheme{seahorse}
+%\usecolortheme{whale}
+%\usecolortheme{wolverine}
+
+%\setbeamertemplate{footline} % To remove the footer line in all slides
+%\setbeamertemplate{footline}[page number] % To replace the footer line
+
+%\setbeamertemplate{navigation symbols}{} % To remove the navigation symbols from the bottom of all slides uncomment this line
+}
+
+\usepackage{graphicx} % Allows including images
+\usepackage{booktabs} % Allows the use of \toprule, \midrule and \bottomrule in tables
+
+%----------------------------------------------------------------------------------------
+%	TITLE PAGE
+%----------------------------------------------------------------------------------------
+
+\title[Analyzing CA Education Trends]{Analyzing California Education Trends}
+
+\author{Neal Marquez} % Your name
+\institute[UW] % Your institution as it will appear on the bottom of every slide, may be shorthand to save space
+{
+University of Washington \\ % Your institution for the title page
+\medskip
+\textit{nmarquez@uw.com} % Your email address
+}
+\date{December 5, 2017} % Date, can be changed to a custom date
+
+\begin{document}
+
+\begin{frame}
+\titlepage % Print the title page as the first slide
+\end{frame}
+
+\begin{frame}
+\frametitle{Overview} % Table of contents slide, comment this block out to del
+\tableofcontents % Throughout your presentation,
+% if you choose to use \section{} and \subsection{} commands, these will
+% automatically be printed on this slide as an overview of your presentation
+\end{frame}
+
+%-------------------------------------------------------------------------------
+%	PRESENTATION SLIDES
+%-------------------------------------------------------------------------------
+
+%------------------------------------------------
+\section{Background} % Sections can be created in order to organize your
+%------------------------------------------------
+
+% \subsection{Subsection Example} % A subsection can be created just before a set
+% of slides with a common theme to further break down your presentation into chunks
+
+\begin{frame}
+\frametitle{Education Trends for Minority Students}
+\begin{itemize}
+\item Past 15 years have seen increase in minority representation in higher education
+\begin{itemize}
+\item True for both rates and ablsolute numbers
+\end{itemize}
+\item Despite this there continues to be unequal representation by various factors
+\begin{itemize}
+\item Time till graduation
+\item Graduation rates
+\item Differnces of attainment by economic status
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Historical Trends}
+\begin{figure}
+\includegraphics[width=0.8\linewidth]{../data/plots/pew.png}
+\end{figure}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Motivation}
+\begin{itemize}
+  \item How does this pattern play out for more prestegious universities?
+  \begin{itemize}
+    \item Some evidence with Ivy League schools
+  \end{itemize}
+  \item Does the composition of the student demogrpahy play a role?
+  \begin{itemize}
+    \item Do students benfit when demographies reflect their own or others?
+  \end{itemize}
+  \item How have these effects changed over time?
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Mechanisms of Operation}
+\begin{block}{Economic Investment}
+Different levels of investment in education may reflect different levels of
+acceptance into prestigious academic universities by way of preparing and
+motivating students.
+\end{block}
+
+\begin{block}{Role Theory}
+Individuals take place in certain roles that are legitamized throush social
+interaction. Students who are part of groups that have historically been
+associated with high achievement.
+\end{block}
+
+\begin{block}{Evolving Home Environment}
+Individual's circumstances at home are differential by different race and class
+identifiers. The environment may be changing in a beneficial, ore detrimental,
+manner allowing more time for academic pursuit.
+\end{block}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Hypothesis Tests}
+How does the proportion of a particular racial group alter the chances of a
+hispanic student being accepted to a prestigious university?  \\
+~ \\
+How has this effect changed over time and how much does it differ across
+schools for hispanic students?
+\end{frame}
+
+%------------------------------------------------
+\section{Data}
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Data}
+\begin{itemize}
+  \item High school demographic data pulled from DOE CA
+  \begin{itemize}
+    \item Population counts of graduating class by racial groups
+    \item Data span range 1994-2015
+  \end{itemize}
+  \item University of California application data
+  \begin{itemize}
+    \item Counts of applied, admitted, and accepted populations by racial groups
+    \item Data span range 1994-2015
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Data Merging}
+\begin{columns}[c] % The "c" option specifies centered vertical alignment
+
+\column{.5\textwidth} % Left column and width
+\begin{itemize}
+\item Data for high school changes racial groups
+\item Naming conventions are not ubiquitous
+\item No guarantee for consistent identification
+\end{itemize}
+
+\column{.5\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=0.8\linewidth]{../data/plots/datascreengrab.png}
+\end{figure}
+\end{columns}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Variables in Model}
+
+\begin{itemize}
+  \item Response
+  \begin{itemize}
+    \item Counts of Hispanic students admitted into UC institutions for school(i) year (j)
+  \end{itemize}
+  \item Variables
+    \begin{itemize}
+      \item Time scaled ($(2015 - x) / 10$)
+      \item Proportion of White students in school at year of graduation.
+    \end{itemize}
+  \item Offset
+  \begin{itemize}
+    \item Student Hispanic population count
+    \item Applying Hispanic student count
+  \end{itemize}
+\end{itemize}
+
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Sampled Trends}
+\begin{figure}
+\includegraphics[width=0.8\linewidth]{../data/plots/sample_plot.png}
+\end{figure}
+\end{frame}
+
+%------------------------------------------------
+\section{Model Building}
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Functional Form}
+\begin{block}{Model Family Form}
+  \begin{itemize}
+    \item $\hat{\theta}_{ij} = exp(\boldsymbol{\beta}\mathbf{X} + \mathbf{ZY}) \mathbf{E}$
+    \begin{enumerate}
+      \item Poisson($\theta$)
+      \begin{itemize}
+        \item Mean $= \theta$
+        \item Var $= \theta$
+      \end{itemize}
+      \item NB2($\theta$, $\psi$)
+      \begin{itemize}
+        \item Mean $= \theta$
+        \item Var $= \theta + \frac{\theta^2}{\psi}$
+      \end{itemize}
+    \end{enumerate}
+  \end{itemize}
+\end{block}
+\end{frame}
+
+%------------------------------------------------
+
+%\begin{frame}[fragile] % Need to use the fragile option when verbatim is used in the slide
+\begin{frame}
+\frametitle{Model Testing: $\boldsymbol{\beta}\mathbf{X} + \mathbf{ZY}$}
+\begin{enumerate}
+  \item $\beta_0 + \text{time}_{ij} \beta_1  + \text{pwhite}_{ij} \beta_2$
+  \item $\beta_0 + \text{time}_{ij} \beta_1  + \text{pwhite}_{ij} \beta_2 + \text{pwhite}_{ij}\text{time}_{ij} \beta_3$
+  \item $\beta_0 + \text{time}_{ij} \beta_1  + \text{pwhite}_{ij} \beta_2 + \text{pwhite}_{ij}\text{time}_{ij} \beta_3 + \zeta_{0j}$
+  \item $\beta_0 + \text{time}_{ij} \beta_1  + \text{pwhite}_{ij} \beta_2 + \text{pwhite}_{ij}\text{time}_{ij} \beta_3 + \zeta_{0i} + \text{time}_{ij} \zeta_{1i}$
+\end{enumerate}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+  \frametitle{Variance Structure}
+  Random Effects Structure \\
+  ~ \\
+\begin{flalign*}
+\begin{bmatrix}
+   \zeta_{0i} \\
+   \zeta_{1i} \\
+\end{bmatrix}
+\
+\sim \mathcal{N} \Bigg(
+\
+\begin{bmatrix}
+   0 \\
+   0 \\
+\end{bmatrix}
+\
+,
+\begin{bmatrix}
+   \sigma_0^2 & \sigma_{01} \\
+   \sigma_{01} & \sigma_1^2 \\
+\end{bmatrix}
+\
+\Bigg)
+\end{flalign*}
+\end{frame}
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Model Comparison Tests}
+
+\begin{tabular}{l|r|r|r|r|r}
+\hline
+  & Df & AIC & BIC & Chisq & Pr\\
+\hline
+Model1 & 4 & 66206.67 & 66235.50 & NA & NA\\
+\hline
+Model2 & 5 & 65998.90 & 66034.94 & 209.7641 & 0\\
+\hline
+Model3 & 6 & 58867.16 & 58910.41 & 7133.7411 & 0\\
+\hline
+Model4 & 8 & 58329.97 & 58387.62 & 541.1961 & 0\\
+\hline
+\end{tabular}
+
+\end{frame}
+
+%------------------------------------------------
+\section{Model Diagnostics}
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Residuals}
+\begin{columns}[c] % The "c" option specifies centered vertical alignment
+
+\column{.5\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=0.8\linewidth]{../data/plots/level1_residuals.png}
+\end{figure}
+
+\column{.5\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=0.8\linewidth]{../data/plots/temporalresiduals.png}
+\end{figure}
+
+\end{columns}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Random Effect Distribution}
+\begin{figure}
+\includegraphics[width=0.8\linewidth]{../data/plots/model1RE.png}
+\end{figure}
+\end{frame}
+
+%------------------------------------------------
+\section{Results}
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Population-Admitted}
+\begin{columns}[c] % The "c" option specifies centered vertical alignment
+
+\column{.58\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=1\linewidth]{../data/plots/avgpredcadm.png}
+\end{figure}
+
+\column{.58\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=1\linewidth]{../data/plots/simspredcadm.png}
+\end{figure}
+
+\end{columns}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Population-Applied}
+\begin{columns}[c] % The "c" option specifies centered vertical alignment
+
+\column{.58\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=1\linewidth]{../data/plots/avgpredcapp.png}
+\end{figure}
+
+\column{.58\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=1\linewidth]{../data/plots/simspredcapp.png}
+\end{figure}
+
+\end{columns}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Applied-Admitted}
+\begin{columns}[c] % The "c" option specifies centered vertical alignment
+
+\column{.58\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=1\linewidth]{../data/plots/avgpredappadm.png}
+\end{figure}
+
+\column{.58\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=1\linewidth]{../data/plots/simspredappadm.png}
+\end{figure}
+
+\end{columns}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Hsipanic Population Covariate}
+\begin{columns}[c] % The "c" option specifies centered vertical alignment
+
+\column{.58\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=1\linewidth]{../data/plots/havgpredcapp.png}
+\end{figure}
+
+\column{.58\textwidth} % Right column and width
+\begin{figure}
+\includegraphics[width=1\linewidth]{../data/plots/havgpredapadm.png}
+\end{figure}
+
+\end{columns}
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}
+\Huge{\centerline{The End}}
+\end{frame}
+
+%----------------------------------------------------------------------------------------
+
+\end{document}
