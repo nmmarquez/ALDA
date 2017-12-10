@@ -21,6 +21,16 @@ mmCtrl <- glmerControl(
 )
 
 # create the formulas to use in model testing
+ff0 <- list(
+    formula(uc_addmitted ~ 1 + yearM * white_prop + offset(log(count))),
+    formula(uc_addmitted ~ 1 + yearM * hisp_prop + offset(log(count))),
+    formula(uc_addmitted ~ 1 + yearM * white_prop + offset(log(uc_applied))),
+    formula(uc_addmitted ~ 1 + yearM * hisp_prop + offset(log(uc_applied))),
+    formula(uc_applied ~ 1 + yearM * white_prop + offset(log(count))),
+    formula(uc_applied ~ 1 + yearM * hisp_prop + offset(log(count))))
+ff1 <- lapply(ff0, function(x) update(x, ~ . + (1|ID)))
+ff2 <- lapply(ff0, function(x) update(x, ~ . + (1|ID))) 
+
 ffsimple <- formula(
     uc_addmitted ~ 1 + white_prop + yearM + offset(log(count)))
 ffintact <- update(ffsimple, ~ . + white_prop*yearM)

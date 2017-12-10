@@ -110,10 +110,66 @@ Models 1-4 estimate the number of Hispanic students who are admitted into a UC s
 
 The indicators $i$ and $j$ represent a particular high school and year respectively. For model fitting purposes the variable $\text{Year}_{j}$ is actually a re-centered scaled version of the actual year such that $\text{Year}_{j} = \text{ActualYear}_{j}/10 - 20.15$. In this way our interpretation of the intercept is the effect of our particular demography covariate, $\gamma_{\text{demog}}$, for the last year of the analysis, 2015. The scaling factor allows the models to converge more efficiently and alters our interpretation of the effect on time such that it is a unit change of ten years time.
 
-Because we expect High Schools to have a high level of heterogeneity in their relationship between Hispanic students accepted and the proportion of White students in a particular school we also test for the inclusion of a set of random effects for each model. We will use Model 1 described above in order to demonstrate the inclusion of random effects however their inclusion will be tested for each of the six models. The baseline Model 1 which includes no random effects will be hereto referred to as $\text{Model}_{10}$. $\text{Model}_{11}$ will then refer to the inclusion of a random intercept for each high school in the study which is modeled as follows
+Because we expect High Schools to have a high level of heterogeneity in their relationship between Hispanic students accepted and the proportion of White students in a particular school we also test for the inclusion of a set of random effects for each model. We will use Model 1 described above in order to demonstrate the inclusion of random effects however their inclusion will be tested for each of the six models. The baseline Model 1 which includes no random effects will be hereto referred to as $\text{Model}_{10}$. $\text{Model}_{11}$ will then refer to the inclusion of a random intercept, an unconditional means model, for each high school in the study, $\zeta_{0i}$, as well as a variance estimator for those effects $\sigma^2_{0}$, which is modeled as follows
 
-$\hat{\theta}_{ij}^{\text{adm}} = exp(\gamma_0 + \zeta_{0i} + \gamma_{\text{time}}\text{Year}_{j} + \gamma_{\text{demog}} Pr(\text{White})_{ij} + \gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{white})_{ij}) N^{\text{Hispanic}}_{ij}$  
-$\zeta_{0i} \sim \mathcal{N}(0, \sigma_)$
+$$
+\begin{aligned}
+\hat{\theta}_{ij}^{\text{adm}} = exp(\gamma_0 + \zeta_{0i} + \gamma_{\text{time}} \text{Year}_{j} + \gamma_{\text{demog}} & Pr(\text{White})_{ij} + \gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{white})_{ij}) N^{\text{Hispanic}}_{ij} \\  
+\zeta_{0i} & \sim \mathcal{N}(0, \sigma^2_0)
+\end{aligned}
+$$
+
+We also test for the inclusion of random slope effects, unconditional growth model referred to as $\text{Model}_{12}$, on time for each school, $\zeta_{1i}$, which also includes a variance parameter, $\sigma_1^2$, as well as a covariance parameter with the random intercept, $\sigma_{01}$. the model formulation is then as follows
+
+$$
+\begin{aligned}
+\hat{\theta}_{ij}^{\text{adm}} = exp(\gamma_0 + \zeta_{0i} +   (\gamma_{\text{time}} + \zeta_{1i}) \text{Year}_{j} + \gamma_{\text{demog}} & Pr(\text{White})_{ij} + \gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{white})_{ij}) N^{\text{Hispanic}}_{ij} \\  
+\end{aligned}
+$$
+
+$$
+\
+\begin{bmatrix}
+   \zeta_{0i} \\
+   \zeta_{1i} \\
+\end{bmatrix}
+\
+\sim \mathcal{N} \Bigg(
+\
+\begin{bmatrix}
+   0 \\
+   0 \\
+\end{bmatrix}
+\
+,
+\begin{bmatrix}
+   \sigma_0^2 & \sigma_{01} \\
+   \sigma_{01} & \sigma_1^2 \\
+\end{bmatrix}
+\
+\Bigg)
+$$
+
+With this approach we now have 3 new submodels for each Model 1-6 listed above giving us a total of 18 functional forms to test for. Models will be referred to with the notation $\text{Model}_{kl}$ where $k$ is an indicator for model 1-6 above and $l$ is an indicator for the number of random effects included, either 0, 1, or 2.
+
+The model formations listed above gives us the structural backbone for estimating the mean number of Hispanic students either admitted or applying for a UC institution however we still need a likelihood function by which to evaluate the model. For each of the 18 models created thus far we will then test two likelihood formulations, using a Poisson distribution and a Negative Binomial distribution. For the Poisson distribution, all that is needed for a model likelihood is rate parameter, $\lambda$, which for our models will be our estimated value of $\theta$. The Negative Binomial model also requires an additional dispersion parameter $\psi$ which must be estimated. The models then have a likelihood distribution for the likelihood evaluation function  $\mathcal{L}(\theta|Y)$,  such that
+
+$$
+\begin{aligned}
+\text{Poisson}(\theta) \\
+\text{Mean} = \theta \\
+\text{Var} = \theta \\
+\text{NB}(\theta, \psi) \\
+\text{Mean} = \theta \\
+\text{Var} = \theta + \frac{\theta^2}{\psi}
+\end{aligned}
+$$
+
+We can then refer to each model with an additional $P$, for Poisson, or $N$, for Negative Binomial, indicator to signify the distribution likelihood. For example $\text{Model}_{12P}$ would be Model 1 with 2 random effects and evaluated with a Poisson distribution.
+
+Each base model will be tested against every other model with same base but different number of random effects and the two types of likelihoods using likelihood ratio tests. This gives us a total 36 models to estimate parameters for and a total of 5 pairwise model likelihood comparisons to run for each model base, 30 pairwise model comparisons in total.
+
+All models and analysis were run using the package `lme4` in `R` version `3.4.3`.  
 
 ## Analysis
 
