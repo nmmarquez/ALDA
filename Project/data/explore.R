@@ -126,12 +126,6 @@ hisp_data_senior %>% mutate(Data="Full Data") %>%
     labs(y="Density", x="Proportion of White Students", 
          title="Yearly Densities of Demographic Proportions: White")
 
-hisp_data_senior %>% filter(hisp_prop != 0 & year %in% 1996:2015) %>%
-    ggplot(aes(x=hisp_prop)) + geom_density(fill="red", alpha=.3) + 
-    geom_density(data=merged_adm_data, fill="blue", alpha=.3) + 
-    facet_wrap(~year) + 
-    scale_fill_manual(name="Test", labels=c("Full Data", "Matched Data"))
-
 # number of weird records we need to address in the HS data set
 sum(merged_adm_data$uc_applied > merged_adm_data$count)
 
@@ -144,6 +138,7 @@ sum(merged_adm_data$uc_applied > merged_adm_data$count)
 sum(merged_adm_data$uc_addmitted > merged_adm_data$count)
 
 write.csv(merged_adm_data, "./merged_data.csv", row.names=F)
+save(merged_adm_data, hisp_data_uc, hisp_data_senior, file="./merged_data.Rdata")
 
 merged_adm_data %>%
     ggplot(aes(x=count, y=uc_addmitted, color=white_prop)) + geom_point() + 

@@ -2,7 +2,10 @@
 title: "Differential Rates of Hispanic Higher Education"
 author: "Neal Marquez"
 date: "December 15, 2015"
-output: pdf_document
+output: 
+    pdf_document:
+        fig_width: 6
+        fig_height: 3
 ---
 
 ---
@@ -48,6 +51,49 @@ code.r{
 </style>
 
 <div style="line-height: 2em;">
+
+```{R warning=FALSE,message=FALSE,error=FALSE,echo=FALSE}
+rm(list=ls())
+library(tidyverse)
+library(pander)
+library(ggplot2)
+library(mvtnorm)
+library(lme4)
+set.seed(123)
+load("./data/merged_data.Rdata")
+load("./data/model_results.Rdata")
+
+sim_results <- function(data, model){
+    data_og <- data
+    ognames <- names(data)
+    ids <- unique(data$ID)
+    ranVcov <-  summary(model)$varcor$ID[1:2,1:2]
+    ranDF <- rmvnorm(length(ids), sigma=ranVcov) %>% as.data.frame %>% 
+        rename(Intercept=V1, Slope=V2) %>% mutate(ID=ids)
+    data <- left_join(data, ranDF, by="ID") %>% 
+        mutate(predf=predict(model, newdata=., re.form=NA)) %>%
+        mutate(pred= exp(predf + Intercept + Slope*yearM))
+    return(data)
+        
+}
+
+sim_many <- function(n, model){
+    groupPred <- expand.grid(year=1994:2015, white_prop=c(.7, .3), count=1) %>%
+        mutate(hisp_prop=1-white_prop) %>%
+        mutate(yearM=(year-max(DF$year)) / 10, uc_applied=1) %>%
+        mutate(demog=ifelse(white_prop > .5, "High White", "Low White")) %>%
+        mutate(ID=ifelse(white_prop > .5, 1, 2))
+    
+    groupPredSims <- lapply(1:n, function(x)
+        (mutate(sim_results(groupPred, model), sim=x))) %>% bind_rows %>%
+        mutate(ID = sim*100 + ID)
+    
+    groupPred <- groupPred %>% 
+        mutate(pred=exp(predict(model, newdata=., re.form=NA)))
+    
+    list(sims=groupPredSims, gmean=groupPred)
+}
+```
 
 ## Introduction  
 Hispanic students have recently seen major shifts in the rate of acceptance and participation in higher education. Hispanics have historically lagged behind other ethnic/racial groups in various measures of educational attainment, however, in a study released in 2014 by the Pew Research Center, college enrollment in two and four year institutions in the United States has more than tripled in the time span between 1996 and 2012. In spring 2012, the proportion of students that graduated from High School who were Hispanic, around 18%, was near equal to the proportion of students attending college in 2012, around 19%. Nevertheless, there continues to be inequalities in other measures of higher education such as graduation rates, time till graduation, and the caliber of the institutions that they attend relative to their White peers. Furthermore, how Hispanic students differ amongst themselves by other socioeconomic factors such as region or income has been well documented as well.  
@@ -119,7 +165,7 @@ $$
 \end{aligned}
 $$
 
-We also test for the inclusion of random slope effects, unconditional growth model referred to as $\text{Model}_{12}$, on time for each school, $\zeta_{1i}$, which also includes a variance parameter, $\sigma_1^2$, as well as a covariance parameter with the random intercept, $\sigma_{01}$. the model formulation is then as follows
+We also test for the inclusion of random slope effects, unconditional growth model referred to as $\text{Model}_{12}$, on time for each school, $\zeta_{1i}$, which also includes a variance parameter, $\sigma_1^2$, as well as a covariance parameter with the random intercept, $\sigma_{01}$, for which I will report the transformation to the correlation estimate $\rho_{01}$ . the model formulation is then as follows
 
 $$
 \begin{aligned}
@@ -167,10 +213,341 @@ $$
 
 We can then refer to each model with an additional $P$, for Poisson, or $N$, for Negative Binomial, indicator to signify the distribution likelihood. For example $\text{Model}_{12P}$ would be Model 1 with 2 random effects and evaluated with a Poisson distribution.
 
-Each base model will be tested against every other model with same base but different number of random effects and the two types of likelihoods using likelihood ratio tests. This gives us a total 36 models to estimate parameters for and a total of 5 pairwise model likelihood comparisons to run for each model base, 30 pairwise model comparisons in total.
+Each base Poisson model x, $\text{Model}_{x0P}$, will be tested against $\text{Model}_{x1P}$ which will be tested against model $\text{Model}_{x2P}$ and then the model $z$ which has the best performing random effects structure $\text{Model}_{xzP} $will be test against the corresponding Negative binomial model, $\text{Model}_{xzN}$, using a likelihood ratio test. The model that has significantly more explanation will be used for inference. The likelihood ratio chi squared tests will be the deciding factor for model inference AIC and BIC will also be calculated.
 
 All models and analysis were run using the package `lme4` in `R` version `3.4.3`.  
 
 ## Analysis
 
+In order to assess the degree to which the data that we lost due to not finding a corresponding high school name county match in both data sets I plotted the yearly densities of population precentages for both Hispanic and White students for the full data set and the merged data set where a mtch was found. Figure 1 shows the Hispanic population densities overlapped and there appears to be similar represenntation in  both the full and merged datasets as evidinced by the large overlap of the two densities. In Figure 2 the same plot is Made for the White population percentage and although the overlap is less than when looking at the Hispanic density overlap the differnce seems to largely occur at the tails of the distribution.
+
+```{R echo=FALSE,fig.cap="Yearly Densities of Demographic Proportions: Hispanic"}
+hisp_data_senior %>% filter(hisp_prop != 0) %>% 
+    mutate(Data="Full Data") %>%
+    bind_rows((merged_adm_data %>% mutate(Data="Merged Data"))) %>%
+    filter(year %in% 1996:2015) %>%
+    ggplot(aes(x=hisp_prop, group=Data, fill=Data)) + geom_density(alpha=.3) + 
+    facet_wrap(~year) + 
+    labs(y="Density", x="Proportion of Hispanic Students") + 
+    scale_x_continuous(breaks=c(0.25, .75)) + 
+    scale_y_continuous(breaks=1.0)
+```
+
+```{R echo=F,fig.cap="Yearly Densities of Demographic Proportions: White"}
+hisp_data_senior %>% mutate(Data="Full Data") %>%
+    bind_rows((merged_adm_data %>% mutate(Data="Merged Data"))) %>%
+    filter(year %in% 1996:2015) %>%
+    ggplot(aes(x=white_prop, group=Data, fill=Data)) + geom_density(alpha=.3) + 
+    facet_wrap(~year) + 
+    labs(y="Density", x="Proportion of White Students") + 
+    scale_x_continuous(breaks=c(0.25, .75)) + 
+    scale_y_continuous(breaks=1.0)
+```
+
+To assess the validity of using a log-linear model I plot the time series for a subset of the data to show that the rate of acceptance of hispanic students appears to follow a log linear relationship. This relationship holds for all rates in consideration for our model families, that is $\frac{\text{Hispanic Admission}}{\text{Hispanic Population}}$, $\frac{\text{Hispanic Admission}}{\text{Hispanic Application}}$ and $\frac{\text{Hispanic Application}}{\text{Hispanic Population}}$.
+
+```{R echo=F,fig.cap="Log-Linear Time-Series of Hispanic Student Admission/Population"}
+set.seed(123)
+samp1 <- merged_adm_data %>% 
+    filter(year==2015 & demo_comp == "Low White Pop.") %>% 
+    select(school, county, demo_comp) %>% unique %>% sample_n(8)
+samp2 <- merged_adm_data %>%
+    filter(year==2015 & demo_comp == "High White Pop.") %>% 
+    select(school, county, demo_comp) %>% unique %>% sample_n(8) 
+
+sub_merged_data <- rbind(samp1, samp2) %>% mutate(keep=1) %>% 
+    right_join(merged_adm_data %>% select(-demo_comp), by=c("school","county")) %>% 
+    mutate(keep=ifelse(is.na(keep), 0, 1)) %>%
+    filter(keep==1)
+
+ggplot(sub_merged_data, aes(
+    x=year, y=log(uc_addmitted/count + .01), color=demo_comp)) + 
+    geom_point() + 
+    geom_smooth(method="lm", se=F) +
+    facet_wrap(~school) + 
+    labs(y="Log Rate of Admission to UC", x="Year") +
+    scale_color_discrete(
+        name="Demography", 
+        labels=c("High White\n(p>.7)", "Low White\n(p<.3)")) + 
+    scale_x_continuous(breaks=c(2000, 2010))
+```
+
+When using Poisson and Negative Binomial models two assumptions need to be checked for model validity. First a test of overdispersion needs to be done in order to see if the Poisson distribution assertion of the mean being equal to the variance is valid. I am implictly testing for this by comparing the model fits between the Negative Binomial model and the Poisson model, which compares the fit of a model who has the mean equal to variance a ssumption versus a model that has a seperate variance parameter that needs to be estimated. The results for comparisons between Poisson models and Negative Binomial models are included in the paper Appendix. In addition,  we also need to expect our outcomes of interest for evidence of zero inflation in the model. If significant zero inflation is present then a piecewise model is required which will produce more zeros than a typical Poisson or Negative Binomial Model with the same mean. Figure 4 shows the histograms of the outcome variables, Hispanic student Addmission and Application, and significant zero inflation does not appear to be present in either outcome.
+
+```{R echo=F, fig.cap="Inspection of Zero Inflation"}
+merged_adm_data %>% select(uc_applied, uc_addmitted) %>%
+    gather(Measure, Value) %>% 
+    mutate(Measure=c(uc_applied="Applied", uc_addmitted="Addmitted")[Measure]) %>%
+    ggplot(aes(x=Value)) + geom_histogram(bins=30) + 
+    facet_wrap(~Measure) + labs(x="", y="Count")
+```
+
+All poisson models were fitted and tested against models with the same base structure, but differing random effects structure. That is to say for all models $x$ where $x \in \{ 1,2,3,4,5,6\}$ we ran likelihood ratio tests for models $\text{Model}_{x0P}$ vs $\text{Model}_{x1P}$ and then $\text{Model}_{x1P}$ vs $\text{Model}_{x2P}$. For each model form $x$ the form $x$ the structure $\text{Model}_{x2P}$ was chosen based on the chi squared statistic and for most formulations, the same model most often provided the lowest AIC and BIC. A full set of tests may be found in Table 2 in the appendix. I then tested each Poisson model against the corresponding Negative Binomial Model, $\text{Model}_{x0P}$ vs $\text{Model}_{x2N}$ in order to test for the need to account for excess variation in the response variable after accounting for covariates and offsets. Models 1, 2, 5, and 6 had a signficantly better fit of the data after inclusion of the overdispersion parameter $\psi$ while models 3 and 4 did not require the extra parameter.
+
+The final models used for inference are then $\text{Model}_{12N}$, $\text{Model}_{22N}$, $\text{Model}_{32P}$, $\text{Model}_{42P}$, $\text{Model}_{52N}$, and $\text{Model}_{62N}$. The fitted parameter values for each model's parameters $\gamma_{0}, \gamma_{\text{time}}, \gamma_{\text{demog}}, \gamma_{\text{tdemog}}, \sigma^2_0, \sigma^2_1, \rho_{01}$ and $\psi$, as well as the confidence intervals for all gamma values can be found in the appendix in Table 14. Each $\gamma$ gixed effect was found to be signficant at the $(p < .05)$ level for all models except for $\gamma_{\text{time}}$ for $\text{Model}_{62N}$. This means that for each of our models there was a signficant effect of demography  and demography interacted with time. 
+
+This leads to two interesting findings to how the demography of Hispanic students high school altered there chance of admission or application into the UC schools. For each model where $\gamma_\text{demog}$ was the proportion of White students in the graduating class of a High School, the coefficient was positive, indicating that in 2015, Hispanic students who attend school with predominatly White students have a higher rate of both applying and attending a UC school in comparison to their Hispanic peers who attend high schools with low White populations. When $\gamma_\text{demog}$ is the proportion of Hispanic students in the graduating class of a High School, the parameter is consistently and signficantly negative, indicating that in 2015 Hispanic students who attend high schools with low proportions of Hispnaic students in the graduating class tend to have a higher rate of applying and attending a UC school in comparison to their peers who attend high schools with high proportions of Hispnaic students.
+
+In addition to this, I found that for Models 1, 2, 5 and 6, although there was a significant effect of $\gamma_\text{demog}$, the differnce was being minimized over time, indicated by signficant values of the parameter $\gamma_\text{tdemog}$, which closed the gap between estimated values of $\hat{\theta}$ from the year 1994 to 2015. The opposite is true, however, for Models 3 and 4 which have a widening gap between the same years. This trend is evidenced in Figures 5-7, in the appendix, which shows the average expected value for admissions for two schools, one with a consistent white population precentage of .7 and another of .3, between 1994 to 2015 as a rate of total population, admissions as a rate of applying population, and applications as a rate of total population for Figure 5, 6, and 7 respectively. Figure 8, in the appendix, shows a similar graph with the average rate of addmissions per application for two schools, one with Hispanic population percentage of .7 and the other .3.
+
+The random effect parameters, $\zeta_{0i}$ and $\zeta_{1i}$, were inspected for patterns of autcorrelation and sufficient normality criteria. Figure 5 and 6 show the level 0 errors and level 1 errors over time for $\text{Model}_{12N}$ and no signficant amount of bias at any time period appears to occur. This patterns holds true for all models used for inference. Figure 9 looks at the distribution of the random slope and and random intercept estimates for $\text{Model}_{12N}$ against a QQ plot and no signficant deviations away from the expectation are found. Again this holds true for all models used for inference.
+
+```{R echo=F,fig.cap="Residual Autocorrelation Level 0"}
+DF2 <- DF %>% 
+    mutate(l1pred=predict(models$Model_12N, type="response"), 
+           l1resid=uc_addmitted - l1pred,
+           l1residstd = l1resid/sd(l1resid),
+           l0pred=predict(models$Model_12N, type="response", re.form=NA), 
+           l0resid=uc_addmitted - l0pred,
+           l0residstd = l0resid/sd(l0resid))
+
+ggplot(data=DF2, aes(x=year, y=l0residstd)) +
+    # adding some horizontal jittering so we can see overplotting
+    geom_point(position=position_jitter(width=0.1, height=0)) +
+    # horizontal reference line
+    geom_hline(yintercept=0) +
+    theme_bw() +
+    xlab("Year") +
+    ylab("Standardized level-0 residuals")
+```
+
+```{R echo=F,fig.cap="Residual Autocorrelation Level 1"}
+ggplot(data=DF2, aes(x=year, y=l1residstd)) +
+    # adding some horizontal jittering so we can see overplotting
+    geom_point(position=position_jitter(width=0.1, height=0)) +
+    # horizontal reference line
+    geom_hline(yintercept=0) +
+    theme_bw() +
+    xlab("Year") +
+    ylab("Standardized level-1 residuals")
+```
+
+```{R echo=F, fig.cap="Q-Q plot of Standardized Random Effects (Model_12N)"}
+ranef(models$Model_12N)[[1]] %>%  
+    mutate(`(Intercept)`=(`(Intercept)` - mean(`(Intercept)`)) / sd(`(Intercept)`),
+           yearM=(yearM - mean(yearM)) / sd(yearM)) %>%
+    gather(key=effect, value=estimate, `(Intercept)`, yearM) %>%
+    mutate(effect=c(`(Intercept)`="Intercept", yearM="Year")[effect]) %>%
+    ggplot(aes(sample=estimate)) +
+    stat_qq() +
+    theme_bw() +
+    # facet by effect type to separate out the two
+    facet_grid(.~effect) +
+    xlab("Theoretical Normal Quantiles") +
+    ylab("Standardized Random Effects") +
+    # add an identity line y=x to compare equality of distributions
+    geom_abline(intercept=0, slope=1)
+```
+
+Interpreting the effect of the random effect variance terms is difficult to do without some graphical assistance so in order to analyze the heterogeniety of school random effects and intercepts we will plot 100 simulations around the expected values for the schools presented in plots 5-8 in the appendix. Fiigures 5 and 7 correspond to $\text{Model}_{12N}$ and $\text{Model}_{52N}$ respectively and show a considerable amount of variation across schools for both the random effect on the intercept and the slope. Many of the simulated values deviate far from the mean value and sometimes resemble the school with the contrasting demographic population. Figures 6 and 8, corresponding to $\text{Model}_{32P}$ and $\text{Model}_{42P}$ respectively, however, do not show neraly the same degree of school variation within the two groups. While this is evidenced quite strongly graphically, it is also reflected in Table 14 where the estimates for the the varaition of the random slope and intercept for these models are less than $.003$.
+
 ## Conclusion
+
+## Appendix
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_10P   4    79154   79183    NA         NA     
+
+ Model_11P   5    60666   60702   18490       0      
+
+ Model_12P   7    59320   59371   1350    9.045e-294
+-----------------------------------------------------
+Table: Chi Squared Tests
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_12P   7    59320   59371    NA         NA     
+
+ Model_12N   8    58330   58388   992.5   7.647e-218
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_20P   4    78335   78364    NA         NA     
+
+ Model_21P   5    60477   60513   17860       0      
+
+ Model_22P   7    58949   59000   1532        0      
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_22P   7    58949   59000    NA         NA     
+
+ Model_22N   8    58000   58058   951.2   7.444e-209
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_30P   4    47206   47235    NA         NA     
+
+ Model_31P   5    47199   47235   8.817    0.002984  
+
+ Model_32P   7    47196   47246   7.586    0.02253   
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_32P   7    47196   47246    NA         NA     
+
+ Model_32N   8    47198   47255     0         1      
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_40P   4    47248   47277    NA         NA     
+
+ Model_41P   5    47238   47274   11.78   0.0005989  
+
+ Model_42P   7    47236   47287   6.091    0.04758   
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_42P   7    47236   47287    NA         NA     
+
+ Model_42N   8    47238   47296     0         1      
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_50P   4    93368   93397    NA         NA     
+
+ Model_51P   5    65335   65371   28036       0      
+
+ Model_52P   7    63183   63233   2156        0      
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_52P   7    63183   63233    NA         NA     
+
+ Model_52N   8    61893   61951   1292    7.458e-283
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_60P   4    92073   92102    NA         NA     
+
+ Model_61P   5    65247   65283   26828       0      
+
+ Model_62P   7    62720   62770   2531        0      
+-----------------------------------------------------
+
+-----------------------------------------------------
+   Model     Df    AIC     BIC    Chisq   Pr(>Chisq)
+----------- ---- ------- ------- ------- ------------
+ Model_62P   7    62720   62770    NA         NA     
+
+ Model_62N   8    61528   61586   1194    1.282e-261
+-----------------------------------------------------
+
+-------------------------------------------------------------
+    **Model**           $\gamma_0$     $\gamma_{\text{time}}$    
+--------------- ---------------------- ----------------------
+ **Model_12N**   -2.45**(-2.5,-2.39)     0.31**(0.26,0.36)   
+
+ **Model_22N**    -1.92**(-2,-1.85)     -0.14**(-0.19,-0.1)  
+
+ **Model_32P**   -0.56**(-0.58,-0.55)   -0.24**(-0.25,-0.22)
+
+ **Model_42P**   -0.47**(-0.49,-0.45)   -0.19**(-0.21,-0.18)
+
+ **Model_52N**   -1.8**(-1.85,-1.75)     0.72**(0.68,0.76)   
+
+ **Model_62N**   -1.48**(-1.55,-1.41)    -0.04(-0.08,0.01)   
+-------------------------------------------------------------
+Table: Model Parameter Estimates \*\*:p<.05
+
+----------------------------------------------------------------------------------------------
+  **Model**     $\gamma_{\text{demog}}$  $\gamma_{\text{tdemog}}$  $\sigma^2_0$  $\sigma^2_1$  
+--------------- ----------------------- ------------------------- -------------  -------------
+ **Model_12N**    0.47**(0.34,0.61)      -0.53**(-0.62,-0.44)      0.25            0.06
+
+ **Model_22N**   -0.78**(-0.9,-0.66)      0.75**(0.66,0.84)        0.25            0.06
+
+ **Model_32P**    0.17**(0.13,0.22)       0.09**(0.05,0.13)        0.002           0.001   
+
+ **Model_42P**   -0.09**(-0.13,-0.06)    -0.04**(-0.08,-0.01)      0.002           0.001  
+
+ **Model_52N**      0.14**(0,0.27)       -0.96**(-1.05,-0.88)      0.26            0.06
+
+ **Model_62N**   -0.57**(-0.69,-0.46)     1.12**(1.03,1.2)         0.24            0.06
+-----------------------------------------------------------------------------------------
+
+-----------------------------------
+  **Model**     $\rho_{12}$  $\psi$
+--------------- ----------- -------
+ **Model_12N**   0.09        24.91
+
+ **Model_22N**   0.23         26   
+
+ **Model_32P**    1           NA   
+
+ **Model_42P**    1           NA   
+
+ **Model_52N**   0.1         31.21
+
+ **Model_62N**   0.14        33.23
+-----------------------------------
+
+```{R echo=F, fig.cap="Total Hispanic Student Rate of Acceptance by School Demography"}
+set.seed(123)
+model1 <- sim_many(100, models$Model_12N)
+model2 <- sim_many(100, models$Model_52N)
+model3 <- sim_many(100, models$Model_32P)
+model4 <- sim_many(100, models$Model_42P)
+
+ggplot(model1$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
+    geom_line(alpha=.3, linetype=2) + 
+    geom_line(data=model1$gmean, size=2) + 
+    labs(x="Year", y="Rate Admitted to UC (per 1000)")  + 
+    scale_color_discrete(
+        name="Demography", 
+        labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
+```
+
+```{R echo=F,fig.cap="Applied Hispanic Student Rate of Acceptance by School Demography"}
+ggplot(model3$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
+    geom_line(alpha=.4, linetype=2) + 
+    geom_line(data=model3$gmean, size=2) + 
+    labs(x="Year", y="Rate Admitted to UC (per 1000)") + 
+    scale_color_discrete(
+        name="Demography", 
+        labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
+```
+
+```{R echo=F,fig.cap="Hispanic Student Rate of Application by School Demography"}
+ggplot(model2$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
+    geom_line(alpha=.3, linetype=2) + 
+    geom_line(data=model2$gmean, size=2)  + 
+    labs(x="Year", y="Rate Applying to UC (per 1000)") + 
+    scale_color_discrete(
+        name="Demography", 
+        labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
+```
+
+```{R echo=F,fig.cap="Hispanic Student Rate of Admission per Application School Demography (Hispanic)"}
+ggplot(model4$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
+    geom_line(alpha=.3, linetype=2) + 
+    geom_line(data=model4$gmean, size=2)  + 
+    labs(x="Year", y="Rate Admitted to UC (per 1000)") + 
+    scale_color_manual(
+        name="Demography", 
+        labels=c("Low Hispanic\n(p=.3)", "High Hispanic\n(p=.7)"),
+        values=c("green", "purple"))
+```
+
+## References

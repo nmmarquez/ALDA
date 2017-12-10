@@ -9,13 +9,13 @@ library(boot)
 library(mvtnorm)
 library(knitr)
 
-load(file="./results.Rdata")
+load(file="./model_results.Rdata")
 
 DF <- DF %>% 
-    mutate(l1pred=predict(ranNB, type="response"), 
+    mutate(l1pred=predict(models$Model_12N, type="response"), 
            l1resid=uc_addmitted - l1pred,
            l1residstd = l1resid/sd(l1resid),
-           l0pred=predict(ranNB, type="response"), 
+           l0pred=predict(models$Model_12N, type="response"), 
            l0resid=uc_addmitted - l0pred,
            l0residstd = l0resid/sd(l0resid))
 head(DF)
@@ -44,7 +44,7 @@ ggplot(data=DF, aes(x=year, y=l1residstd)) +
 dev.off()
 
 png("./plots/model1RE.png", width=600)
-ranef(ranNB)[[1]] %>%  
+ranef(models$Model_12N)[[1]] %>%  
     mutate(`(Intercept)`=(`(Intercept)` - mean(`(Intercept)`)) / sd(`(Intercept)`),
            yearM=(yearM - mean(yearM)) / sd(yearM)) %>%
     gather(key=effect, value=estimate, `(Intercept)`, yearM) %>%
@@ -61,7 +61,7 @@ ranef(ranNB)[[1]] %>%
 dev.off()
 
 png("./plots/model2RE.png", width=600)
-ranef(ranNBcapp)[[1]] %>%  
+ranef(models$Model_52N)[[1]] %>%  
     mutate(`(Intercept)`=(`(Intercept)` - mean(`(Intercept)`)) / sd(`(Intercept)`),
            yearM=(yearM - mean(yearM)) / sd(yearM)) %>%
     gather(key=effect, value=estimate, `(Intercept)`, yearM) %>%
@@ -78,7 +78,7 @@ ranef(ranNBcapp)[[1]] %>%
 dev.off()
 
 png("./plots/model3RE.png", width=600)
-ranef(ranPappadm)[[1]] %>%  
+ranef(models$Model_32P)[[1]] %>%  
     mutate(`(Intercept)`=(`(Intercept)` - mean(`(Intercept)`)) / sd(`(Intercept)`),
            yearM=(yearM - mean(yearM)) / sd(yearM)) %>%
     gather(key=effect, value=estimate, `(Intercept)`, yearM) %>%
@@ -125,9 +125,9 @@ sim_many <- function(n, model){
 }
 
 set.seed(123)
-model1 <- sim_many(100, ranNB)
-model2 <- sim_many(100, ranNBcapp)
-model3 <- sim_many(100, ranPappadm)
+model1 <- sim_many(100, models$Model_12N)
+model2 <- sim_many(100, models$Model_52N)
+model3 <- sim_many(100, models$Model_32P)
 
 png("./plots/simspredcadm.png", width=600)
 ggplot(model1$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
