@@ -1,0 +1,120 @@
+---
+title: "Differential Rates of Hispanic Higher Education"
+author: "Neal Marquez"
+date: "December 15, 2015"
+output: pdf_document
+---
+
+---
+references:
+- id: Lastname2000
+  title: "Dramatic statement: a slightly more nuanced secondary title."
+  author:
+  - family: Lastname
+    given: Firstname
+  container-title: Journal Name
+  volume: 5
+  page: 100-150
+  type: article-journal
+  issued:
+    year: 2000
+
+- id: Bigdeal2009
+  title: "Studies on everything"
+  author:
+  - family: Bigdeal
+    given: O
+  - family: Bigdeal
+    given: P
+  container-title: "A chapter in the book of everything"
+  page: 50
+  type: chapter
+  issued:
+    year: 2009
+...
+
+<style type="text/css">
+h1, h2, h3, h4, h5, h6 {
+    font-family: Times New Roman;
+    font-size: 18px;
+}
+body, td {
+    font-family: Times New Roman;
+    font-size: 14px;
+}
+code.r{
+    font-size: 12px;
+}
+</style>
+
+<div style="line-height: 2em;">
+
+## Introduction  
+Hispanic students have recently seen major shifts in the rate of acceptance and participation in higher education. Hispanics have historically lagged behind other ethnic/racial groups in various measures of educational attainment, however, in a study released in 2014 by the Pew Research Center, college enrollment in two and four year institutions in the United States has more than tripled in the time span between 1996 and 2012. In spring 2012, the proportion of students that graduated from High School who were Hispanic, around 18%, was near equal to the proportion of students attending college in 2012, around 19%. Nevertheless, there continues to be inequalities in other measures of higher education such as graduation rates, time till graduation, and the caliber of the institutions that they attend relative to their White peers. Furthermore, how Hispanic students differ amongst themselves by other socioeconomic factors such as region or income has been well documented as well.  
+
+In this study, I wish to analyze how the lived experience of Hispanic students, in terms of the demographic composition of whom they attend school with, may alter an individuals chance of attending a more prestigious or elite institution. This study looks at the intersecting effect of how the surrounding demographics and the environment of a Hispanic student alters the chances that they have to enter a prestigious university. While previous studies have analyzed how individuals differ in their educational attainment and/or success by economic status, our analysis strictly looks at how demographic structure alters those chances within in the Hispanic community. Namely I wish to see how Hispanic students who are predominantly in high school with a majority White population may have had different rates of admission into prestigious universities when compared with Hispanic students who are in schools with a low percentage of White students. Additionally I wish to see how Hispanic students who are predominately in Hispanic populated High Schools differ in their rate of acceptance to prestigious universities from Hispanic students who attend High Schools with low Hispanic populations. Moreover, I want to analyze how the rates of acceptance between these two populations of students have changed over time.
+
+I hypothesize that Hispanic students who are in High Schools with high White populations, and conversely Low Hispanic populations, have historically had greater success at being admitted into prestigious collegiate institutions because of their experience interacting with a racial group who, historically, has been more often associated with institutions of higher education. However, I expect that while there may be historical differences between Hispanic students in High White population schools and Low White population schools, that these differences will be diminishing over time as reflected by differential rates of change in the rate of acceptance into prestigious Universities over time. Despite, this I also hypothesize that Hispanic students will still have differential rate of acceptance in the final year of the study which is 2015.
+
+Due to data collection restrictions the scope of this analysis will be limited to public High Schools and Universities within the state of California. For the purpose of this study we will operationalize prestigious universities as any of the institutions part of the public University of California umbrella. Within the state of California there are two major systems of public universities, the Universities of California (UC) and the California State schools (Cal State), of which there are 10 and 23 respectively. The UC schools have had lower acceptance rates, more organizations dedicated fully to research, and higher rates of high impact research in comparison to the Cal state schools. The Cal State schools on the other hand focus more on practical and applied training, rather than theoretical, and hold a majority of the California public college students.
+
+## Methods  
+
+### Data Collection  
+
+Data was collected from two major sources in our analysis, one source for annual college application and admission data separated by high school of application and race and another for annual high school senior graduating class school demographics.  
+
+High school demographic information was obtained from the California Department of Education for the academic years between 1990-91 to 2015-16. Information on the counts of total students as well as number of students broken down by racial and ethnicity groups for each public high school in the state of California, which are uniquely identified by a reference name, district of operation, and county of residence. Though distinctions for individuals of multi-ethnic have changed over time the two categories that I am concerned with in this analysis have not had major revisions in the study period. One point of analytical concern is that these groups do not represent mutually exclusive options, and students may mark one or more groups as the racial group that they wish to identify as. Although previous research has cited that more Hispanic citizens of the United States are now more often referring to themselves as Hispanic and White [@Bigdeal2009], this distinction should only push our hypothesis to null findings and still be able to distinguish between individuals who solely identify as white.
+
+When comparing the size of high school population numbers of students of Hispanic and White backgrounds two important pieces of demographic information need to be addressed. It is a well known fact that the racial/ethnic composition of the United States is rapidly changing towards a more prevalent Hispanic population and this phenomena is even more pervasive in the state of California. In the table below are the numbers of students in the state of California public high school graduating class who refer to themselves as Hispanic, White, and the total number of students. While 2007 marked the first year in this data set where Hispanic students represented a greater number of students than the White population in the public school graduating class, as seen in Table 1, this trend would continue into 2015 where Hispanic students had a count of 217,397 students and Whites had a count of 114,408 students.
+
+-------------- -------- -------- -------- -------- -------- -------- --------
+   **Year**      2001     2002     2003     2004     2005     2006     2007  
+
+ **Hispanic**   103795   109043   116858   121019   129724   128462   143476
+
+  **White**     139228   140440   144678   141522   140796   138595   141344
+
+  **Total**     316124   325919   341278   342987   355275   356641   376393
+-------------- -------- -------- -------- -------- -------- -------- --------
+
+Table: Racial/Ethnic Population Counts Of Graduating Students
+
+An additional point of consideration when examining this dataset is that it only represents a single time point of a students academic career, the point at which they graduated. Although students more often than not remain in the high school which they started, any significant changes to the student population due to dropout or school transfer would mean that our graduating class demographics is not a good representation of a students lived demographic experience. Again while transfers are usually low among high school students, it has been well documented that the rate of dropout for students of Hispanic backgrounds has historically been and continues to be much higher than any other racial group. Because of this our numbers may underestimate the percentage of Hispanic students, and overestimate the number of White students, that an individual student may have historically come into contact with in their time in high school.
+
+Data on college application and admission was pulled from University of California Information Center for the number of yearly applications applied, admitted and accepted to any institution in the University of California system broken down by 5 major ethnic groups, including Hispanic/Latino and White, as well as by the home institution, usually high school, which a student is applying from. Data is censored such that any unit of measure that is lower than three students is censored from the data set in order to protect the anonymity of the students applying. In addition, each high school is uniquely identified by a combination of name, city, and county of residence.
+
+Because the two data sets have different strategies for uniquely identifying High School institutions, and the names which each data set uses is not consistent, we do not conserve the entirety of our dataset in this analysis. Of the 15326 high school years that are reported by the UC admissions and applications dataset only 9970 of the records (65.05%) had an appropriate match when matching just with name and county. Because of this I further analyze the difference between the full data set and the merged data set in the analysis portion of this paper.
+
+### Statistical Approach
+
+In order to analyze this data, for each matched high school year we calculate the number of Hispanic students in the graduating class, the number of White students in the graduating class, the total number of students in the school, the proportion of students who are White and Hispanic in the graduating class, the number of Hispanic students who applied and admitted to any of the University of California schools. In the Statistical models I want to test four main hypothesis.  
+
+1. Does the proportion of White students at a Hispanic students school affect their chance of application into a UC?
+2. Does the proportion of White students at a Hispanic students school affect their chance of admission into a UC?
+1. Does the proportion of Hispanic students at a Hispanic students school affect their chance of application into a UC?
+2. Does the proportion of Hispanic students at a Hispanic students school affect their chance of admission into a UC?
+
+For each of these hypothesis we also wish to examine how this relationship between demography and Hispanic student application and admission has changed over time.
+
+To test these hypothesis we run a series of six models which have the following mean function for estimating $\theta$, which can either be $\hat{\theta}^{\text{adm}}$ an estimator for mean number of Hispanic students admitted or $\hat{\theta}^{\text{app}}$ an estimator for the mean number of students who applied.
+
+1. $\hat{\theta}_{ij}^{\text{adm}} = exp(\gamma_0 + \gamma_{\text{time}}\text{Year}_{j} + \gamma_{\text{demog}} Pr(\text{White})_{ij} + \gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{white})_{ij}) N^{\text{Hispanic}}_{ij}$
+1. $\hat{\theta}_{ij}^{\text{adm}} = exp(\gamma_0 + \gamma_{\text{time}}\text{Year}_{j} + \gamma_{\text{demog}} Pr(\text{Hispanic})_{ij} + \gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{Hispanic})_{ij}) N_{ij}^{\text{Hispanic}}$
+1. $\hat{\theta}_{ij}^{\text{adm}} = exp(\gamma_0 + \gamma_{\text{time}}\text{Year}_{j} + \gamma_{\text{demog}} Pr(\text{White})_{ij} + \gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{white})_{ij}) N^{\text{Hispanic Applied}}_{ij}$
+1. $\hat{\theta}_{ij}^{\text{adm}} = exp(\gamma_0 + \gamma_{\text{time}}\text{Year}_{j} + \gamma_{\text{demog}} Pr(\text{Hispanic})_{ij} +\gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{Hispanic})_{ij})N_{ij}^{\text{Hispanic Applied}}$
+1. $\hat{\theta}_{ij}^{\text{app}} = exp(\gamma_0 + \gamma_{\text{time}}Year_{j} + \gamma_{\text{demog}} Pr(\text{White})_{ij} + \gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{white})_{ij}) N^{\text{Hispanic}}_{ij}$
+1. $\hat{\theta}_{ij}^{\text{app}} = exp(\gamma_0 + \gamma_{\text{time}}\text{Year}_{j} + \gamma_{\text{demog}} Pr(\text{Hispanic})_{ij} +\gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{Hispanic})_{ij})N_{ij}^{\text{Hispanic}}$
+
+Models 1-4 estimate the number of Hispanic students who are admitted into a UC school while models 5 and 6 estimate the number of Hispanic students who attempt to apply to a UC school. In order to adjust for the number of Hispanic students in each high school we was an offset value $N$ which is either the total number of Hispanic students in the graduating class, $N^{\text{Hispanic}}$, or the number of Hispanic students who applied, $N^{\text{Hispanic Applied}}$.
+
+The indicators $i$ and $j$ represent a particular high school and year respectively. For model fitting purposes the variable $\text{Year}_{j}$ is actually a re-centered scaled version of the actual year such that $\text{Year}_{j} = \text{ActualYear}_{j}/10 - 20.15$. In this way our interpretation of the intercept is the effect of our particular demography covariate, $\gamma_{\text{demog}}$, for the last year of the analysis, 2015. The scaling factor allows the models to converge more efficiently and alters our interpretation of the effect on time such that it is a unit change of ten years time.
+
+Because we expect High Schools to have a high level of heterogeneity in their relationship between Hispanic students accepted and the proportion of White students in a particular school we also test for the inclusion of a set of random effects for each model. We will use Model 1 described above in order to demonstrate the inclusion of random effects however their inclusion will be tested for each of the six models. The baseline Model 1 which includes no random effects will be hereto referred to as $\text{Model}_{10}$. $\text{Model}_{11}$ will then refer to the inclusion of a random intercept for each high school in the study which is modeled as follows
+
+$\hat{\theta}_{ij}^{\text{adm}} = exp(\gamma_0 + \zeta_{0i} + \gamma_{\text{time}}\text{Year}_{j} + \gamma_{\text{demog}} Pr(\text{White})_{ij} + \gamma_{\text{tdemog}}\text{Year}_{j}Pr(\text{white})_{ij}) N^{\text{Hispanic}}_{ij}$  
+$\zeta_{0i} \sim \mathcal{N}(0, \sigma_)$
+
+## Analysis
+
+## Conclusion

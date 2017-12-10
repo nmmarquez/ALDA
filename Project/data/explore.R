@@ -2,6 +2,7 @@ rm(list=ls())
 
 library(tidyverse)
 library(RecordLinkage)
+library(pander)
 setwd("~/Documents/Classes/ALDA/Project/data/")
 
 senior_files <- list.files("./CAHSData", full.names=TRUE) %>% 
@@ -21,6 +22,10 @@ senior_data_wide <- rbind_list(lapply(senior_files, function(x)
 
 senior_data_wide %>% select(county, district, school) %>% unique %>% nrow
 senior_data_wide %>% select(county, district, school, cds_code) %>% unique %>% nrow
+
+senior_data_wide %>% select(white, hispanic, total, year) %>% group_by(year) %>% 
+    summarize(Hispanic=sum(hispanic), White=sum(white), Total=sum(total)) %>% 
+    as.data.frame %>% t %>% pander
 
 uc_files <- list.files("./UCdata", full.names=TRUE) %>% 
     grep("Universitywide", ., value=T)
@@ -89,16 +94,43 @@ sum(hisp_data_uc$uc_applied < hisp_data_uc$uc_addmitted)
 select(hisp_data_senior, county, school) %>% unique %>% nrow
 # data points in UC data
 select(hisp_data_uc, county, school) %>% unique %>% nrow
-# data points in joined data
+# data points in joined data over UC data points
 inner_join((select(hisp_data_senior, county, school) %>% unique %>% mutate(cat1=1)),
            (select(hisp_data_uc, county, school) %>% unique %>% mutate(cat2=1))) %>%
-    nrow
-
+    nrow %>% `/`(select(hisp_data_uc, county, school) %>% unique %>% nrow)
 
 merged_adm_data <- inner_join(hisp_data_senior, hisp_data_uc)
 merged_adm_data <- merged_adm_data %>% select(county, school) %>%
     unique %>% mutate(., ID=1:nrow(.)) %>% right_join(merged_adm_data) %>%
     filter(count != 0) %>% mutate(year0=year-min(year))
+
+hisp_data_senior %>% filter(hisp_prop != 0) %>%
+    ggplot(aes(x=hisp_prop)) + geom_density() + facet_wrap(~year)
+merged_adm_data %>% filter(hisp_prop != 0) %>%
+    ggplot(aes(x=hisp_prop)) + geom_histogram() + facet_wrap(~year)
+
+hisp_data_senior %>% filter(hisp_prop != 0) %>% 
+    mutate(Data="Full Data") %>%
+    bind_rows((merged_adm_data %>% mutate(Data="Merged Data"))) %>%
+    filter(year %in% 1996:2015) %>%
+    ggplot(aes(x=hisp_prop, group=Data, fill=Data)) + geom_density(alpha=.3) + 
+    facet_wrap(~year) + 
+    labs(y="Density", x="Proportion of Hispanic Students", 
+         title="Yearly Densities of Demographic Proportions: Hispanic")
+
+hisp_data_senior %>% mutate(Data="Full Data") %>%
+    bind_rows((merged_adm_data %>% mutate(Data="Merged Data"))) %>%
+    filter(year %in% 1996:2015) %>%
+    ggplot(aes(x=white_prop, group=Data, fill=Data)) + geom_density(alpha=.3) + 
+    facet_wrap(~year) + 
+    labs(y="Density", x="Proportion of White Students", 
+         title="Yearly Densities of Demographic Proportions: White")
+
+hisp_data_senior %>% filter(hisp_prop != 0 & year %in% 1996:2015) %>%
+    ggplot(aes(x=hisp_prop)) + geom_density(fill="red", alpha=.3) + 
+    geom_density(data=merged_adm_data, fill="blue", alpha=.3) + 
+    facet_wrap(~year) + 
+    scale_fill_manual(name="Test", labels=c("Full Data", "Matched Data"))
 
 # number of weird records we need to address in the HS data set
 sum(merged_adm_data$uc_applied > merged_adm_data$count)

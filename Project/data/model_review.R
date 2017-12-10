@@ -7,6 +7,7 @@ library(lmtest)
 library(ggplot2)
 library(boot)
 library(mvtnorm)
+library(knitr)
 
 load(file="./results.Rdata")
 
@@ -139,10 +140,30 @@ ggplot(model1$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) +
         labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
 dev.off()
 
+png("./plots/avgpredcadm.png", width=600)
+ggplot(model1$gmean, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
+    geom_line() + 
+    labs(x="Year", y="Rate of Senior Students Admitted to UC (per 1000)",
+         title="Total Hispanic Student Rate of Acceptance by School Demography")  + 
+    scale_color_discrete(
+        name="Demography", 
+        labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
+dev.off()
+
 png("./plots/simspredcapp.png", width=600)
 ggplot(model2$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
     geom_line(alpha=.3, linetype=2) + 
     geom_line(data=model2$gmean, size=2)  + 
+    labs(x="Year", y="Rate of Students Applying to UC (per 1000)",
+         title="Hispanic Student Rate of Application by School Demography") + 
+    scale_color_discrete(
+        name="Demography", 
+        labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
+dev.off()
+
+png("./plots/avgpredcapp.png", width=600)
+ggplot(model2$gmean, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
+    geom_line() + 
     labs(x="Year", y="Rate of Students Applying to UC (per 1000)",
          title="Hispanic Student Rate of Application by School Demography") + 
     scale_color_discrete(
@@ -160,3 +181,24 @@ ggplot(model3$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) +
         name="Demography", 
         labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
 dev.off()
+
+png("./plots/avgpredappadm.png", width=600)
+ggplot(model3$gmean, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
+    geom_line() + 
+    labs(x="Year", y="Rate of Applying Students Admitted to UC (per 1000)",
+         title="Applied Hispanic Student Rate of Acceptance by School Demography") + 
+    scale_color_discrete(
+        name="Demography", 
+        labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
+dev.off()
+
+summary(ranNB)
+summary(ranPappadm)
+
+DF %>%
+    ggplot(aes(x=uc_applied, y=uc_addmitted, color=white_prop)) + geom_point() + 
+    geom_smooth(method="lm", color="red")
+
+DF %>%
+    ggplot(aes(x=uc_applied, y=uc_addmitted, color=year)) + 
+    geom_point(alpha=.2) + geom_smooth(method="lm", color="red")

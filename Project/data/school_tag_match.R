@@ -39,10 +39,12 @@ search_wikipedia <- function(search_string, n=5){
 }
 
 search_duckduckgo <- function(search_string, n=5){
-    url_ <- "http://api.duckduckgo.com/"
-    query_ <- list("q" = search_string, "format" = "json")
+    url_ <- paste0(
+        "https://www.googleapis.com/customsearch/v1?q=", 
+        gsub(" ", "+", search_string),
+        "&cx=011063122771479583948:qmwmio2yb-g")
     
-    jsonResults <- GET(url = url_, query = query_) %>% 
+    jsonResults <- GET(url = url_) %>% 
         content(as = "text") %>%
         fromJSON 
     

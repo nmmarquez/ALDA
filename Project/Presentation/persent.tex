@@ -178,7 +178,7 @@ associated with high achievement.
 
 \begin{block}{Evolving Home Environment}
 Individual's circumstances at home are differential by different race and class
-identifiers. The environment may be changing in a beneficial, ore detrimental,
+identifiers. The environment may be changing in a beneficial, or detrimental,
 manner allowing more time for academic pursuit.
 \end{block}
 \end{frame}
@@ -389,6 +389,22 @@ Model4 & 8 & 58329.97 & 58387.62 & 541.1961 & 0\\
 %------------------------------------------------
 
 \begin{frame}
+  \frametitle{Parameter Estimates}
+\begin{tabular}{l|r|r|r|r|r|r|r|r}
+\hline
+Model & $\beta_0$ & $\beta_1$ & $\beta_2$ & $\beta_3$ & $\sigma^2_{0}$ & $\sigma^2_{1}$ & $\rho_{01}$ & $\psi$ \\
+\hline
+Pop-Adm & .09 & 1.37 & 1.61 & .59 & .25 & .06 & .09 & 24.9 \\
+\hline
+Pop-App & .17 & 2.05 & 1.15 & .38 & .26 & .06 & .10 & 31.2 \\
+\hline
+App-Adm & .57 & .79 & 1.19 & 1.09 & 0.002 & 0.001 & .99 &  \\
+\hline
+\end{tabular}
+\end{frame}
+%------------------------------------------------
+
+\begin{frame}
 \frametitle{Population-Admitted}
 \begin{columns}[c] % The "c" option specifies centered vertical alignment
 
@@ -446,7 +462,7 @@ Model4 & 8 & 58329.97 & 58387.62 & 541.1961 & 0\\
 %------------------------------------------------
 
 \begin{frame}
-\frametitle{Hsipanic Population Covariate}
+\frametitle{Hispanic Population Covariate}
 \begin{columns}[c] % The "c" option specifies centered vertical alignment
 
 \column{.58\textwidth} % Right column and width
@@ -463,8 +479,30 @@ Model4 & 8 & 58329.97 & 58387.62 & 541.1961 & 0\\
 \end{frame}
 
 %------------------------------------------------
+
 \begin{frame}
-\Huge{\centerline{The End}}
+\frametitle{Results}
+\begin{itemize}
+  \item Hispanic college application and acceptance rates differ by demographic composition.
+  \item Hispanic rates of acceptance into schools as a function of population are increasing for low White population schools but decreasing for high white population schools.
+  \item Rates of acceptance as a function of application are decreasing for both high and low White population Hispanic students, albeit at a significantly different level.
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Limitations}
+\begin{itemize}
+  \item Analysis does not account for economic variables postulated to effect education.
+  \item Schools do not reflect the totality of choices for prestegious universities.
+  \item More in depth analysis of underlying factors driving differences.
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}
+\Huge{\centerline{Questions?}}
 \end{frame}
 
 %----------------------------------------------------------------------------------------
