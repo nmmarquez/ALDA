@@ -2,7 +2,7 @@
 title: "Differential Rates of Hispanic Higher Education"
 author: "Neal Marquez"
 date: "December 15, 2015"
-output: 
+output:
     pdf_document:
         fig_width: 6
         fig_height: 3
@@ -68,13 +68,13 @@ sim_results <- function(data, model){
     ognames <- names(data)
     ids <- unique(data$ID)
     ranVcov <-  summary(model)$varcor$ID[1:2,1:2]
-    ranDF <- rmvnorm(length(ids), sigma=ranVcov) %>% as.data.frame %>% 
+    ranDF <- rmvnorm(length(ids), sigma=ranVcov) %>% as.data.frame %>%
         rename(Intercept=V1, Slope=V2) %>% mutate(ID=ids)
-    data <- left_join(data, ranDF, by="ID") %>% 
+    data <- left_join(data, ranDF, by="ID") %>%
         mutate(predf=predict(model, newdata=., re.form=NA)) %>%
         mutate(pred= exp(predf + Intercept + Slope*yearM))
     return(data)
-        
+
 }
 
 sim_many <- function(n, model){
@@ -83,26 +83,26 @@ sim_many <- function(n, model){
         mutate(yearM=(year-max(DF$year)) / 10, uc_applied=1) %>%
         mutate(demog=ifelse(white_prop > .5, "High White", "Low White")) %>%
         mutate(ID=ifelse(white_prop > .5, 1, 2))
-    
+
     groupPredSims <- lapply(1:n, function(x)
         (mutate(sim_results(groupPred, model), sim=x))) %>% bind_rows %>%
         mutate(ID = sim*100 + ID)
-    
-    groupPred <- groupPred %>% 
+
+    groupPred <- groupPred %>%
         mutate(pred=exp(predict(model, newdata=., re.form=NA)))
-    
+
     list(sims=groupPredSims, gmean=groupPred)
 }
 ```
 
 ## Introduction  
-Hispanic students have recently seen major shifts in the rate of acceptance and participation in higher education. Hispanics have historically lagged behind other ethnic/racial groups in various measures of educational attainment, however, in a study released in 2014 by the Pew Research Center, college enrollment in two and four year institutions in the United States has more than tripled in the time span between 1996 and 2012. In spring 2012, the proportion of students that graduated from High School who were Hispanic, around 18%, was near equal to the proportion of students attending college in 2012, around 19%. Nevertheless, there continues to be inequalities in other measures of higher education such as graduation rates, time till graduation, and the caliber of the institutions that they attend relative to their White peers. Furthermore, how Hispanic students differ amongst themselves by other socioeconomic factors such as region or income has been well documented as well.  
+Hispanic students have recently seen major shifts in the rate of acceptance and participation in higher education. Hispanics have historically lagged behind other ethnic/racial groups in various measures of educational attainment, however, in a study released in 2014 by the Pew Research Center, college enrollment in two and four year institutions in the United States has more than tripled in the time span between 1996 and 2012. In spring 2012, the proportion of students that graduated from High School who were Hispanic, around 18%, was near equal to the proportion of students attending college in 2012, around 19%. Nevertheless, there continues to be inequalities in other measures of higher education such as graduation rates, time till graduation, and the caliber of the institutions that they attend relative to their White peers(**CITE**). Furthermore, how Hispanic students differ amongst themselves by other socioeconomic factors such as region or income has been well documented(**CITE**).  
 
-In this study, I wish to analyze how the lived experience of Hispanic students, in terms of the demographic composition of whom they attend school with, may alter an individuals chance of attending a more prestigious or elite institution. This study looks at the intersecting effect of how the surrounding demographics and the environment of a Hispanic student alters the chances that they have to enter a prestigious university. While previous studies have analyzed how individuals differ in their educational attainment and/or success by economic status, our analysis strictly looks at how demographic structure alters those chances within in the Hispanic community. Namely I wish to see how Hispanic students who are predominantly in high school with a majority White population may have had different rates of admission into prestigious universities when compared with Hispanic students who are in schools with a low percentage of White students. Additionally I wish to see how Hispanic students who are predominately in Hispanic populated High Schools differ in their rate of acceptance to prestigious universities from Hispanic students who attend High Schools with low Hispanic populations. Moreover, I want to analyze how the rates of acceptance between these two populations of students have changed over time.
+In this study, I wish to analyze how the lived experience of Hispanic students, in terms of the demographic composition of whom they attend school with, may alter an individuals chance of attending a more prestigious or elite institution. This study looks at the intersecting effect of how the surrounding demographics and the environment of a Hispanic student alters the chances that they have to enter a prestigious university. While previous studies have analyzed how individuals differ in their educational attainment and/or success by economic status(**CITE**), our analysis strictly looks at how demographic structure alters those chances within in the Hispanic community. Namely, I wish to see how Hispanic students who are predominantly in high school with a majority White population may have had different rates of admission into prestigious universities when compared with Hispanic students who are in schools with a low percentage of White students. Additionally, I wish to see how Hispanic students who are predominately in Hispanic populated high schools differ in their rate of acceptance to prestigious universities from Hispanic students who attend high schools with low Hispanic populations. Moreover, I want to analyze how the rates of acceptance between these populations of students have changed over time.
 
-I hypothesize that Hispanic students who are in High Schools with high White populations, and conversely Low Hispanic populations, have historically had greater success at being admitted into prestigious collegiate institutions because of their experience interacting with a racial group who, historically, has been more often associated with institutions of higher education. However, I expect that while there may be historical differences between Hispanic students in High White population schools and Low White population schools, that these differences will be diminishing over time as reflected by differential rates of change in the rate of acceptance into prestigious Universities over time. Despite, this I also hypothesize that Hispanic students will still have differential rate of acceptance in the final year of the study which is 2015.
+I hypothesize that Hispanic students who are in high schools with high White populations, and conversely low Hispanic populations, have  had greater success at being admitted into prestigious collegiate institutions because of their experience interacting with a racial group who, historically, has been more often associated with institutions of higher education. However, I expect that while there may be differences between Hispanic students in High White population schools and low White population schools, that these differences will be diminishing over time as reflected by differential rates of change in the rate of acceptance into prestigious Universities over time. Despite, this I also hypothesize that Hispanic students will still have differential rate of acceptance in the final year of the study which is 2015.
 
-Due to data collection restrictions the scope of this analysis will be limited to public High Schools and Universities within the state of California. For the purpose of this study we will operationalize prestigious universities as any of the institutions part of the public University of California umbrella. Within the state of California there are two major systems of public universities, the Universities of California (UC) and the California State schools (Cal State), of which there are 10 and 23 respectively. The UC schools have had lower acceptance rates, more organizations dedicated fully to research, and higher rates of high impact research in comparison to the Cal state schools. The Cal State schools on the other hand focus more on practical and applied training, rather than theoretical, and hold a majority of the California public college students.
+Due to data collection restrictions the scope of this analysis will be limited to public high schools and universities within the state of California. For the purpose of this study we will operationalize prestigious universities as any of the institutions part of the public University of California umbrella. Within the state of California there are two major systems of public universities, the Universities of California (UC) and the California State schools (Cal State), of which there are 10 and 23 respectively. The UC schools have had lower acceptance rates, more organizations dedicated fully to research, and higher rates of high impact research in comparison to the Cal state schools. The Cal State schools on the other hand focus more on practical and applied training, rather than theoretical, and hold a majority of the California public college students(**CITE**).
 
 ## Methods  
 
@@ -110,9 +110,9 @@ Due to data collection restrictions the scope of this analysis will be limited t
 
 Data was collected from two major sources in our analysis, one source for annual college application and admission data separated by high school of application and race and another for annual high school senior graduating class school demographics.  
 
-High school demographic information was obtained from the California Department of Education for the academic years between 1990-91 to 2015-16. Information on the counts of total students as well as number of students broken down by racial and ethnicity groups for each public high school in the state of California, which are uniquely identified by a reference name, district of operation, and county of residence. Though distinctions for individuals of multi-ethnic have changed over time the two categories that I am concerned with in this analysis have not had major revisions in the study period. One point of analytical concern is that these groups do not represent mutually exclusive options, and students may mark one or more groups as the racial group that they wish to identify as. Although previous research has cited that more Hispanic citizens of the United States are now more often referring to themselves as Hispanic and White [@Bigdeal2009], this distinction should only push our hypothesis to null findings and still be able to distinguish between individuals who solely identify as white.
+High school demographic information was obtained from the California Department of Education for the academic years between 1990-91 to 2015-16. Information on the counts of total students as well as number of students broken down by racial and ethnicity groups for each public high school in the state of California, which are uniquely identified by a reference name, district of operation, and county of residence. Though distinctions for individuals of multi-ethnic backgrounds have changed over time the two categories that I am concerned with in this analysis have not had major revisions in the study period. One point of analytical concern is that these groups do not represent mutually exclusive options, and students may mark one or more groups as the racial group that they wish to identify as. Although previous research has cited that more Hispanic citizens of the United States are now more often referring to themselves as Hispanic and White(**CITE**), this distinction should only push our hypothesis to null findings and still be able to distinguish between individuals who solely identify as White.
 
-When comparing the size of high school population numbers of students of Hispanic and White backgrounds two important pieces of demographic information need to be addressed. It is a well known fact that the racial/ethnic composition of the United States is rapidly changing towards a more prevalent Hispanic population and this phenomena is even more pervasive in the state of California. In the table below are the numbers of students in the state of California public high school graduating class who refer to themselves as Hispanic, White, and the total number of students. While 2007 marked the first year in this data set where Hispanic students represented a greater number of students than the White population in the public school graduating class, as seen in Table 1, this trend would continue into 2015 where Hispanic students had a count of 217,397 students and Whites had a count of 114,408 students.
+When comparing the size of high school population numbers of students of Hispanic and White backgrounds two important pieces of demographic information need to be addressed. It is a well known fact that the racial/ethnic composition of the United States is rapidly changing towards a more prevalent Hispanic population and this phenomena is even more pervasive in the state of California(**CITE**). In the table below are the numbers of students in the state of California public high school graduating class who refer to themselves as Hispanic, White, and the total number of students. While 2007 marked the first year in this data set where Hispanic students represented a greater number of students than the White population in the public school graduating class, as seen in Table 1, this trend would continue into 2015 where Hispanic students had a count of 217,397 students and Whites had a count of 114,408 students.
 
 -------------- -------- -------- -------- -------- -------- -------- --------
    **Year**      2001     2002     2003     2004     2005     2006     2007  
@@ -126,11 +126,11 @@ When comparing the size of high school population numbers of students of Hispani
 
 Table: Racial/Ethnic Population Counts Of Graduating Students
 
-An additional point of consideration when examining this dataset is that it only represents a single time point of a students academic career, the point at which they graduated. Although students more often than not remain in the high school which they started, any significant changes to the student population due to dropout or school transfer would mean that our graduating class demographics is not a good representation of a students lived demographic experience. Again while transfers are usually low among high school students, it has been well documented that the rate of dropout for students of Hispanic backgrounds has historically been and continues to be much higher than any other racial group. Because of this our numbers may underestimate the percentage of Hispanic students, and overestimate the number of White students, that an individual student may have historically come into contact with in their time in high school.
+An additional point of consideration when examining this dataset is that it only represents a single time point of a students academic career, the point at which they graduated. Although students more often than not remain in the high school which they started, any significant changes to the student population due to dropout or school transfer would mean that our graduating class demographics is not a good representation of a students lived demographic experience. Again while transfers are usually low among high school students, it has been well documented that the rate of dropout for students of Hispanic backgrounds has historically been and continues to be much higher than any other racial/ethnic groups(**CITE**). Because of this our numbers may underestimate the percentage of Hispanic students, and overestimate the number of White students, that an individual student may have historically come into contact with in their time in high school.
 
 Data on college application and admission was pulled from University of California Information Center for the number of yearly applications applied, admitted and accepted to any institution in the University of California system broken down by 5 major ethnic groups, including Hispanic/Latino and White, as well as by the home institution, usually high school, which a student is applying from. Data is censored such that any unit of measure that is lower than three students is censored from the data set in order to protect the anonymity of the students applying. In addition, each high school is uniquely identified by a combination of name, city, and county of residence.
 
-Because the two data sets have different strategies for uniquely identifying High School institutions, and the names which each data set uses is not consistent, we do not conserve the entirety of our dataset in this analysis. Of the 15326 high school years that are reported by the UC admissions and applications dataset only 9970 of the records (65.05%) had an appropriate match when matching just with name and county. Because of this I further analyze the difference between the full data set and the merged data set in the analysis portion of this paper.
+Because the two data sets have different strategies for uniquely identifying High School institutions, and the names which each data set uses is not consistent, we do not conserve the entirety of our dataset in this analysis. Of the 15326 high school years that are reported by the UC admissions and applications dataset only 9970 of the records (65.05%) had an appropriate match when matching just with name and county. Because of this I further analyze the difference between the full data set and the merged data set in the analysis portion of this paper in order to assess the representativeness of the data used in the analysis.
 
 ### Statistical Approach
 
@@ -156,7 +156,7 @@ Models 1-4 estimate the number of Hispanic students who are admitted into a UC s
 
 The indicators $i$ and $j$ represent a particular high school and year respectively. For model fitting purposes the variable $\text{Year}_{j}$ is actually a re-centered scaled version of the actual year such that $\text{Year}_{j} = \text{ActualYear}_{j}/10 - 20.15$. In this way our interpretation of the intercept is the effect of our particular demography covariate, $\gamma_{\text{demog}}$, for the last year of the analysis, 2015. The scaling factor allows the models to converge more efficiently and alters our interpretation of the effect on time such that it is a unit change of ten years time.
 
-Because we expect High Schools to have a high level of heterogeneity in their relationship between Hispanic students accepted and the proportion of White students in a particular school we also test for the inclusion of a set of random effects for each model. We will use Model 1 described above in order to demonstrate the inclusion of random effects however their inclusion will be tested for each of the six models. The baseline Model 1 which includes no random effects will be hereto referred to as $\text{Model}_{10}$. $\text{Model}_{11}$ will then refer to the inclusion of a random intercept, an unconditional means model, for each high school in the study, $\zeta_{0i}$, as well as a variance estimator for those effects $\sigma^2_{0}$, which is modeled as follows
+Because we expect High Schools to have a high level of heterogeneity in their relationship between Hispanic students accepted and the proportion of White students in a particular school, we also test for the inclusion of a set of random effects for each model. We will use Model 1 described above in order to demonstrate the inclusion of random effects, however, their inclusion will be tested for each of the six models. The baseline Model 1 which includes no random effects will be hereto referred to as $\text{Model}_{10}$. $\text{Model}_{11}$ will then refer to the inclusion of a random intercept, an unconditional means model, for each high school in the study, $\zeta_{0i}$, as well as a variance estimator for those effects $\sigma^2_{0}$, which is modeled as follows
 
 $$
 \begin{aligned}
@@ -165,7 +165,7 @@ $$
 \end{aligned}
 $$
 
-We also test for the inclusion of random slope effects, unconditional growth model referred to as $\text{Model}_{12}$, on time for each school, $\zeta_{1i}$, which also includes a variance parameter, $\sigma_1^2$, as well as a covariance parameter with the random intercept, $\sigma_{01}$, for which I will report the transformation to the correlation estimate $\rho_{01}$ . the model formulation is then as follows
+We also test for the inclusion of random slope effects, unconditional growth model referred to as $\text{Model}_{12}$, on time for each school, $\zeta_{1i}$, which also includes a variance parameter, $\sigma_1^2$, as well as a covariance parameter with the random intercept, $\sigma_{01}$, for which I will report the transformation to the correlation estimate $\rho_{01}$ . The model formulation is then as follows
 
 $$
 \begin{aligned}
@@ -211,25 +211,25 @@ $$
 \end{aligned}
 $$
 
-We can then refer to each model with an additional $P$, for Poisson, or $N$, for Negative Binomial, indicator to signify the distribution likelihood. For example $\text{Model}_{12P}$ would be Model 1 with 2 random effects and evaluated with a Poisson distribution.
+We can then refer to each model with an additional $P$, for Poisson, or $N$, for Negative Binomial, indicator to signify the likelihood distribution. For example $\text{Model}_{12P}$ would be Model 1 with 2 random effects and evaluated with a Poisson distribution.
 
-Each base Poisson model x, $\text{Model}_{x0P}$, will be tested against $\text{Model}_{x1P}$ which will be tested against model $\text{Model}_{x2P}$ and then the model $z$ which has the best performing random effects structure $\text{Model}_{xzP} $will be test against the corresponding Negative binomial model, $\text{Model}_{xzN}$, using a likelihood ratio test. The model that has significantly more explanation will be used for inference. The likelihood ratio chi squared tests will be the deciding factor for model inference AIC and BIC will also be calculated.
+Each base Poisson model x, $\text{Model}_{x0P}$, will be tested against $\text{Model}_{x1P}$ which will then be tested against model $\text{Model}_{x2P}$ and then the model $z$ which has the best performing random effects structure $\text{Model}_{xzP}$ will be tested against the corresponding Negative binomial model, $\text{Model}_{xzN}$, using a likelihood ratio test. The model that has more parameters will be used for inference if it has significantly more explanatory power, accounting for the extra number of parameters. The likelihood ratio chi squared tests will be the deciding factor for model inference, but, AIC and BIC will also be calculated.
 
 All models and analysis were run using the package `lme4` in `R` version `3.4.3`.  
 
 ## Analysis
 
-In order to assess the degree to which the data that we lost due to not finding a corresponding high school name county match in both data sets I plotted the yearly densities of population precentages for both Hispanic and White students for the full data set and the merged data set where a mtch was found. Figure 1 shows the Hispanic population densities overlapped and there appears to be similar represenntation in  both the full and merged datasets as evidinced by the large overlap of the two densities. In Figure 2 the same plot is Made for the White population percentage and although the overlap is less than when looking at the Hispanic density overlap the differnce seems to largely occur at the tails of the distribution.
+In order to assess the degree to which the data that we lost due to not finding a corresponding high school name county match in both data sets I plotted the yearly densities of population percentages for both Hispanic and White students for the full data set and the merged data set where a match was found. Figure 1 shows the Hispanic population densities overlapped and there appears to be similar representation in  both the full and merged datasets as evidenced by the large overlap of the two densities. In Figure 2, the same plot is made for the White population percentage and although the overlap is less than when looking at the Hispanic density overlap, the difference seems to largely occur at the tails of the distribution.
 
 ```{R echo=FALSE,fig.cap="Yearly Densities of Demographic Proportions: Hispanic"}
-hisp_data_senior %>% filter(hisp_prop != 0) %>% 
+hisp_data_senior %>% filter(hisp_prop != 0) %>%
     mutate(Data="Full Data") %>%
     bind_rows((merged_adm_data %>% mutate(Data="Merged Data"))) %>%
     filter(year %in% 1996:2015) %>%
-    ggplot(aes(x=hisp_prop, group=Data, fill=Data)) + geom_density(alpha=.3) + 
-    facet_wrap(~year) + 
-    labs(y="Density", x="Proportion of Hispanic Students") + 
-    scale_x_continuous(breaks=c(0.25, .75)) + 
+    ggplot(aes(x=hisp_prop, group=Data, fill=Data)) + geom_density(alpha=.3) +
+    facet_wrap(~year) +
+    labs(y="Density", x="Proportion of Hispanic Students") +
+    scale_x_continuous(breaks=c(0.25, .75)) +
     scale_y_continuous(breaks=1.0)
 ```
 
@@ -237,67 +237,67 @@ hisp_data_senior %>% filter(hisp_prop != 0) %>%
 hisp_data_senior %>% mutate(Data="Full Data") %>%
     bind_rows((merged_adm_data %>% mutate(Data="Merged Data"))) %>%
     filter(year %in% 1996:2015) %>%
-    ggplot(aes(x=white_prop, group=Data, fill=Data)) + geom_density(alpha=.3) + 
-    facet_wrap(~year) + 
-    labs(y="Density", x="Proportion of White Students") + 
-    scale_x_continuous(breaks=c(0.25, .75)) + 
+    ggplot(aes(x=white_prop, group=Data, fill=Data)) + geom_density(alpha=.3) +
+    facet_wrap(~year) +
+    labs(y="Density", x="Proportion of White Students") +
+    scale_x_continuous(breaks=c(0.25, .75)) +
     scale_y_continuous(breaks=1.0)
 ```
 
-To assess the validity of using a log-linear model I plot the time series for a subset of the data to show that the rate of acceptance of hispanic students appears to follow a log linear relationship. This relationship holds for all rates in consideration for our model families, that is $\frac{\text{Hispanic Admission}}{\text{Hispanic Population}}$, $\frac{\text{Hispanic Admission}}{\text{Hispanic Application}}$ and $\frac{\text{Hispanic Application}}{\text{Hispanic Population}}$.
+To assess the validity of using a log-linear model I plot the time series for a subset of the data to show that the rate of acceptance of Hispanic students appears to follow a log-linear relationship. This relationship holds for all rates in consideration for our model families, that is $\frac{\text{Hispanic Admission}}{\text{Hispanic Population}}$, $\frac{\text{Hispanic Admission}}{\text{Hispanic Application}}$ and $\frac{\text{Hispanic Application}}{\text{Hispanic Population}}$.
 
 ```{R echo=F,fig.cap="Log-Linear Time-Series of Hispanic Student Admission/Population"}
 set.seed(123)
-samp1 <- merged_adm_data %>% 
-    filter(year==2015 & demo_comp == "Low White Pop.") %>% 
+samp1 <- merged_adm_data %>%
+    filter(year==2015 & demo_comp == "Low White Pop.") %>%
     select(school, county, demo_comp) %>% unique %>% sample_n(8)
 samp2 <- merged_adm_data %>%
-    filter(year==2015 & demo_comp == "High White Pop.") %>% 
-    select(school, county, demo_comp) %>% unique %>% sample_n(8) 
+    filter(year==2015 & demo_comp == "High White Pop.") %>%
+    select(school, county, demo_comp) %>% unique %>% sample_n(8)
 
-sub_merged_data <- rbind(samp1, samp2) %>% mutate(keep=1) %>% 
-    right_join(merged_adm_data %>% select(-demo_comp), by=c("school","county")) %>% 
+sub_merged_data <- rbind(samp1, samp2) %>% mutate(keep=1) %>%
+    right_join(merged_adm_data %>% select(-demo_comp), by=c("school","county")) %>%
     mutate(keep=ifelse(is.na(keep), 0, 1)) %>%
     filter(keep==1)
 
 ggplot(sub_merged_data, aes(
-    x=year, y=log(uc_addmitted/count + .01), color=demo_comp)) + 
-    geom_point() + 
+    x=year, y=log(uc_addmitted/count + .01), color=demo_comp)) +
+    geom_point() +
     geom_smooth(method="lm", se=F) +
-    facet_wrap(~school) + 
+    facet_wrap(~school) +
     labs(y="Log Rate of Admission to UC", x="Year") +
     scale_color_discrete(
-        name="Demography", 
-        labels=c("High White\n(p>.7)", "Low White\n(p<.3)")) + 
+        name="Demography",
+        labels=c("High White\n(p>.7)", "Low White\n(p<.3)")) +
     scale_x_continuous(breaks=c(2000, 2010))
 ```
 
-When using Poisson and Negative Binomial models two assumptions need to be checked for model validity. First a test of overdispersion needs to be done in order to see if the Poisson distribution assertion of the mean being equal to the variance is valid. I am implictly testing for this by comparing the model fits between the Negative Binomial model and the Poisson model, which compares the fit of a model who has the mean equal to variance a ssumption versus a model that has a seperate variance parameter that needs to be estimated. The results for comparisons between Poisson models and Negative Binomial models are included in the paper Appendix. In addition,  we also need to expect our outcomes of interest for evidence of zero inflation in the model. If significant zero inflation is present then a piecewise model is required which will produce more zeros than a typical Poisson or Negative Binomial Model with the same mean. Figure 4 shows the histograms of the outcome variables, Hispanic student Addmission and Application, and significant zero inflation does not appear to be present in either outcome.
+When using Poisson and Negative Binomial models two assumptions need to be checked for model validity. First, a test of over-dispersion needs to be done in order to see if the Poisson distribution assertion of the mean being equal to the variance is valid. I am implicitly testing for this by comparing the model fits between the Negative Binomial model and the Poisson model, which compares the fit of a model who has the mean equal to variance assumption versus a model that has a separate variance parameter that needs to be estimated. The results for comparisons between Poisson models and Negative Binomial models are included in the paper Appendix in Table 2. In addition,  we also need to inspect our outcomes of interest for evidence of zero inflation in the model. If significant zero inflation is present,then a piecewise model is required which will produce more zeros than a typical Poisson or Negative Binomial Model with the same mean. Figure 4 shows the histograms of the outcome variables, Hispanic student Admission and Application, and significant zero inflation does not appear to be present in either outcome.
 
 ```{R echo=F, fig.cap="Inspection of Zero Inflation"}
 merged_adm_data %>% select(uc_applied, uc_addmitted) %>%
-    gather(Measure, Value) %>% 
+    gather(Measure, Value) %>%
     mutate(Measure=c(uc_applied="Applied", uc_addmitted="Addmitted")[Measure]) %>%
-    ggplot(aes(x=Value)) + geom_histogram(bins=30) + 
+    ggplot(aes(x=Value)) + geom_histogram(bins=30) +
     facet_wrap(~Measure) + labs(x="", y="Count")
 ```
 
-All poisson models were fitted and tested against models with the same base structure, but differing random effects structure. That is to say for all models $x$ where $x \in \{ 1,2,3,4,5,6\}$ we ran likelihood ratio tests for models $\text{Model}_{x0P}$ vs $\text{Model}_{x1P}$ and then $\text{Model}_{x1P}$ vs $\text{Model}_{x2P}$. For each model form $x$ the form $x$ the structure $\text{Model}_{x2P}$ was chosen based on the chi squared statistic and for most formulations, the same model most often provided the lowest AIC and BIC. A full set of tests may be found in Table 2 in the appendix. I then tested each Poisson model against the corresponding Negative Binomial Model, $\text{Model}_{x0P}$ vs $\text{Model}_{x2N}$ in order to test for the need to account for excess variation in the response variable after accounting for covariates and offsets. Models 1, 2, 5, and 6 had a signficantly better fit of the data after inclusion of the overdispersion parameter $\psi$ while models 3 and 4 did not require the extra parameter.
+All Poisson models were fitted and tested against models with the same base structure, but differing random effects structure. That is to say for all models $x$ where $x \in \{ 1,2,3,4,5,6\}$ we ran likelihood ratio tests for models $\text{Model}_{x0P}$ vs $\text{Model}_{x1P}$ and then $\text{Model}_{x1P}$ vs $\text{Model}_{x2P}$. For each model form $x$, the structure $\text{Model}_{x2P}$, unconditional growth model, was chosen based on the chi squared statistic and for most formulations, the same model most often provided the lowest AIC and BIC. A full set of tests may be found in Table 2 in the appendix. I then tested each Poisson model against the corresponding Negative Binomial Model, $\text{Model}_{x0P}$ vs $\text{Model}_{x2N}$ in order to test for the need to account for excess variation in the response variable after accounting for covariates and offsets. Models 1, 2, 5, and 6 had a significantly better fit of the data after inclusion of the over-dispersion parameter $\psi$ while models 3 and 4 did not require the extra parameter.
 
-The final models used for inference are then $\text{Model}_{12N}$, $\text{Model}_{22N}$, $\text{Model}_{32P}$, $\text{Model}_{42P}$, $\text{Model}_{52N}$, and $\text{Model}_{62N}$. The fitted parameter values for each model's parameters $\gamma_{0}, \gamma_{\text{time}}, \gamma_{\text{demog}}, \gamma_{\text{tdemog}}, \sigma^2_0, \sigma^2_1, \rho_{01}$ and $\psi$, as well as the confidence intervals for all gamma values can be found in the appendix in Table 14. Each $\gamma$ gixed effect was found to be signficant at the $(p < .05)$ level for all models except for $\gamma_{\text{time}}$ for $\text{Model}_{62N}$. This means that for each of our models there was a signficant effect of demography  and demography interacted with time. 
+The final models used for inference are then $\text{Model}_{12N}$, $\text{Model}_{22N}$, $\text{Model}_{32P}$, $\text{Model}_{42P}$, $\text{Model}_{52N}$, and $\text{Model}_{62N}$. The fitted parameter values for each model's parameters $\gamma_{0}, \gamma_{\text{time}}, \gamma_{\text{demog}}, \gamma_{\text{tdemog}}, \sigma^2_0, \sigma^2_1, \rho_{01}$ and $\psi$, as well as the confidence intervals for all gamma values can be found in the appendix in Table 14. Each $\gamma$ fixed effect was found to be significant at the $(p < .05)$ level for all models except for $\gamma_{\text{time}}$ for $\text{Model}_{62N}$. This means that for each of our models there was a significant effect of demography  and demography interacted with time.
 
-This leads to two interesting findings to how the demography of Hispanic students high school altered there chance of admission or application into the UC schools. For each model where $\gamma_\text{demog}$ was the proportion of White students in the graduating class of a High School, the coefficient was positive, indicating that in 2015, Hispanic students who attend school with predominatly White students have a higher rate of both applying and attending a UC school in comparison to their Hispanic peers who attend high schools with low White populations. When $\gamma_\text{demog}$ is the proportion of Hispanic students in the graduating class of a High School, the parameter is consistently and signficantly negative, indicating that in 2015 Hispanic students who attend high schools with low proportions of Hispnaic students in the graduating class tend to have a higher rate of applying and attending a UC school in comparison to their peers who attend high schools with high proportions of Hispnaic students.
+This leads to two interesting findings to how the demography of Hispanic students high school altered there chance of admission or application into the UC schools. For each model where $\gamma_\text{demog}$ was the proportion of White students in the graduating class of a high school, the coefficient was positive, indicating that in 2015, Hispanic students who attend school with predominately White students have a higher rate of both applying and attending a UC school in comparison to their Hispanic peers who attend high schools with low White populations. When $\gamma_\text{demog}$ is the proportion of Hispanic students in the graduating class of a High School, the parameter is consistently and significantly negative, indicating that in 2015 Hispanic students who attend high schools with low proportions of Hispanic students in the graduating class tend to have a higher rate of applying and attending a UC school in comparison to their peers who attend high schools with high proportions of Hispanic students.
 
-In addition to this, I found that for Models 1, 2, 5 and 6, although there was a significant effect of $\gamma_\text{demog}$, the differnce was being minimized over time, indicated by signficant values of the parameter $\gamma_\text{tdemog}$, which closed the gap between estimated values of $\hat{\theta}$ from the year 1994 to 2015. The opposite is true, however, for Models 3 and 4 which have a widening gap between the same years. This trend is evidenced in Figures 5-7, in the appendix, which shows the average expected value for admissions for two schools, one with a consistent white population precentage of .7 and another of .3, between 1994 to 2015 as a rate of total population, admissions as a rate of applying population, and applications as a rate of total population for Figure 5, 6, and 7 respectively. Figure 8, in the appendix, shows a similar graph with the average rate of addmissions per application for two schools, one with Hispanic population percentage of .7 and the other .3.
+In addition to this, I found that for Models 1, 2, 5 and 6, although there was a significant effect of $\gamma_\text{demog}$, the differnce was being minimized over time, indicated by significant values of the parameter $\gamma_\text{tdemog}$, which closed the gap between estimated values of $\hat{\theta}$ from the year 1994 to 2015. The opposite is true, however, for Models 3 and 4 which have a widening gap between the same years. This trend is evidenced in Figures 8-10, in the appendix, which shows the average expected value for admissions for two schools, one with a consistent white population percentage of .7 and another of .3, between 1994 to 2015 as a rate of total population, admissions as a rate of applying population, and applications as a rate of total population for Figure 8, 9, and 10 respectively. Figure 11, in the appendix, shows a similar graph with the average rate of admissions per application for two schools, one with Hispanic population percentage of .7 and the other .3.
 
-The random effect parameters, $\zeta_{0i}$ and $\zeta_{1i}$, were inspected for patterns of autcorrelation and sufficient normality criteria. Figure 5 and 6 show the level 0 errors and level 1 errors over time for $\text{Model}_{12N}$ and no signficant amount of bias at any time period appears to occur. This patterns holds true for all models used for inference. Figure 9 looks at the distribution of the random slope and and random intercept estimates for $\text{Model}_{12N}$ against a QQ plot and no signficant deviations away from the expectation are found. Again this holds true for all models used for inference.
+The random effect parameters, $\zeta_{0i}$ and $\zeta_{1i}$, were inspected for patterns of autocorrelation and sufficient normality criteria. Figure 5 and 6 show the level 0 errors and level 1 errors over time for $\text{Model}_{12N}$ and no significant amount of bias at any time period appears to occur. This patterns holds true for all models used for inference. Figure 7 looks at the distribution of the random slope and and random intercept estimates for $\text{Model}_{12N}$ against a QQ plot and no significant deviations away from the expectation are found. Again this holds true for all models used for inference.
 
 ```{R echo=F,fig.cap="Residual Autocorrelation Level 0"}
-DF2 <- DF %>% 
-    mutate(l1pred=predict(models$Model_12N, type="response"), 
+DF2 <- DF %>%
+    mutate(l1pred=predict(models$Model_12N, type="response"),
            l1resid=uc_addmitted - l1pred,
            l1residstd = l1resid/sd(l1resid),
-           l0pred=predict(models$Model_12N, type="response", re.form=NA), 
+           l0pred=predict(models$Model_12N, type="response", re.form=NA),
            l0resid=uc_addmitted - l0pred,
            l0residstd = l0resid/sd(l0resid))
 
@@ -339,9 +339,31 @@ ranef(models$Model_12N)[[1]] %>%
     geom_abline(intercept=0, slope=1)
 ```
 
-Interpreting the effect of the random effect variance terms is difficult to do without some graphical assistance so in order to analyze the heterogeniety of school random effects and intercepts we will plot 100 simulations around the expected values for the schools presented in plots 5-8 in the appendix. Fiigures 5 and 7 correspond to $\text{Model}_{12N}$ and $\text{Model}_{52N}$ respectively and show a considerable amount of variation across schools for both the random effect on the intercept and the slope. Many of the simulated values deviate far from the mean value and sometimes resemble the school with the contrasting demographic population. Figures 6 and 8, corresponding to $\text{Model}_{32P}$ and $\text{Model}_{42P}$ respectively, however, do not show neraly the same degree of school variation within the two groups. While this is evidenced quite strongly graphically, it is also reflected in Table 14 where the estimates for the the varaition of the random slope and intercept for these models are less than $.003$.
+Interpreting the effect of the random effect variance terms is difficult to do without some graphical assistance so in order to analyze the heterogeneity of school random effects and intercepts we will plot 100 simulations around the expected values for the schools presented in plots 5-8 in the appendix. Figures 8 and 10 correspond to $\text{Model}_{12N}$ and $\text{Model}_{52N}$ respectively and show a considerable amount of variation across schools for both the random effect on the intercept and the slope. Many of the simulated values deviate far from the mean value and sometimes resemble the school with the contrasting demographic population. Figures 9 and 11, corresponding to $\text{Model}_{32P}$ and $\text{Model}_{42P}$ respectively, however, do not show nearly the same degree of school variation within the two groups. While this is evidenced quite strongly graphically, it is also reflected in Table 14 where the estimates for the the variation of the random slope and intercept for these models are less than $.003$.
 
 ## Conclusion
+
+### Findings and Interpretations
+
+In order to interpret the coefficients of our analysis we need to exponentiate the parameter estimates and talk about their multiplicative effects rather than the additive effects. Additionally we will talk about rates per 1000 students for the duration of the conclusion.
+
+$\text{Model}_{12N}$ estimated an average rate of Hispanic admittance per 1000 Hispanic students in the graduating class of 86.29(82.09-91.63) where there was a zero percent white population. On the other hand the model estimated that Hispanic students who were in a school that was 90 percent white were 1.53(1.36-1.73) times more likely to be admitted, calculated from $\text{exp}(\gamma_{\text{demog}}^{\text{Model}_{12N}} * .9)$. If we instead examine the results from $\text{Model}_{12N}$ the model estimates that Hispanic students who are at schools where the population percentage of Hispanic students is 100 percent were admitted to UC schools at a rate of 67.21(62.66-72.08) per 1000 Hispanic students in the graduating class. Compare this to Hispanic students who were attending a high school with a 30 percent Hispanic population and we find that those students are 1.73(1.53-1.95) times more likely to be admitted into a UC school. These estimates show that there is a clear benefit for Hispanic students to be part of a school that is high in terms of its white population and low in terms of its Hispanic population, if they wished to attend a UC school for college in 2015.
+
+While these estimates show a measurable and significant difference in the rates of Hispanic admission into UC schools depending on the demographic composition of the students High Schools, both models estimate that this gap is diminishing over time. $\text{Model}_{12N}$ estimates that for Hispanic students in schools with no Whites, the likelihood of being admitted to a UC increases by 1.36(1.20-1.43) times per decade. Compare this with Hispanic students who attend schools that are 70 percent White who see a change of .94(.88-1.00) times in their chance of being admitted and we can see that the gap is closing between Hispanic students in low White and high White school populations. This converging pattern is demonstrated in Figure 8, where average and simulated estimates of Hispanic admittance to a UC per 1000 students in the population is plotted for a low White ($\text{P}_{\text{White}}=.3$) and a high White $(\text{P}_{\text{White}}=.3)$ high school. $\text{Model}_{22N}$ shows a similar result where Hispanic students from high Hispanic population schools are increasing their yearly rate of acceptance more quickly than Hispanics at low Hispanic population high schools.
+
+Almost identical findings were found for rates of application of Hispanic students to UC schools of the graduating student class. Hispanic students from schools that were nearly all White, were 1.15(1.00-1.31) times more likely to apply to a UC school than their Hispanic peers at high schools that were all non-White in 2015, pulled from $\text{Model}_{52N}$. Hispanic students from schools that were nearly all Hispanic, were .57(.50-.63) times as likely to apply to a UC school than their Hispanic peers at high schools that were all non-Hispanic in 2015, pulled from $\text{Model}_{62N}$. And again for both of these models the gap is closing between Hispanic students from different demographic compositions, see Appendix table 14 for estimated $\gamma$ values for corresponding models.
+
+A different result is found in the models that analyze the rate of Hispanic acceptance to UC schools over the number of Hispanic students who apply to UC schools. It is well known that rates of admission to UC schools has been declining for all applicants due to the competitive nature of the application process and the increase in the number of students applying to the UC schools from both within California, nationally, and internationally. This is reflected in our dataset as well and shown well in Figures 9 and 11. What is also shown in these plots is that the difference between rates of admission per application for Hispanic students from different high school demographics is greater now more than ever. In 2015, Hispanic students from high schools with a zero percent White population were admitted to UC schools at a rate of 571.21(559.90-576.95) per 1000 Hispanic applicants, however Hispanic students from schools that were 70 percent white were admitted at a rate that was 1.12(1.10-1.27) times higher, with the gap increasing yearly. The result is less strong yet still significant for Hispanic students from 100 percent Hispanic high schools, rate of admission per 1000 Hispanic applicants was 571.21(548.81-588.61) while for Hispanic students in 30 percent Hispanic population high schools, the rate of admission was 1.07(1.04-1.10) times higher.  
+
+### Closing Remarks
+
+In this analysis I found that rates of application to UC schools per graduating student, admission per graduating student, and admission per applying student differed for Hispanics depending on the demographic composition of the high school that they attended. The difference was meaningful and significant and estimated Hispanic students from high schools that were primarily white having more likely chance to apply and be admitted to a UC school in comparison to their Hispanic peers who were at a High school that was overwhelmingly non-White. Similarly, Hispanic students from high schools that were primarily Hispanic were less likely to apply and be admitted to a UC school in comparison to their Hispanic peers who were at a High school that was overwhelmingly non-Hispanic. this difference was significant for the year 2015, and although the difference between rates of application and admission per graduating Hispanic student by demographic composition seem to be closing over time, the difference between rates of admission per application between Hispanic students of different demographic backgrounds is increasing over time.
+
+This analysis indicates that Hispanic students that come from high White and low Hispanic population schools are in a situation that better positions them to enter more prestigious institutions of higher education. Though this gap is closing its effects are still measurable, meaningful, and significant.
+
+This study comes with several limitations. No characteristics of the schools are students in the study were recorded and thus adjusted for other than the racial group and population number of students per racial group. This means test scores, amount of school funding, number of school resources were not included in the analysis. Additionally, a significant portion of the data was lost due to not having a pairwise match between our two data sources from the California Department of Education and University of California Information Center. Though we should that the full data set and the data set used in the analysis largely resembled each other in terms of the variables included in our analysis, this missingness may have contributed to the results in our study. Furthermore, because the college application and admission data was censored below values of three, I marked all values that were censored to zero. This may have changed the results for schools that had low Hispanic populations, however based on our results it would have driven the observed differences that we saw to null. Another factor that may have altered this study is Hispanic students choosing to go to prestigious universities other than the UC schools. With in California there are a number of highly ranked private universities, such as the University of Southern California, Stanford, California Institute of Technology, etc., which Hispanic students may be disproportionately putting their effort into being admitted. A more in depth study would need to look at both private Universities as well as private high schools to incorporate into the analysis, however, the data is not available in any known public form.
+
+Nevertheless, the goal of this study was to show how Hispanic students differ in their rate of admission to a large well respected prestigious collection of colleges, the Universities of California, depending on the demographic composition of the high school that they attend. Though, other factors were not adjusted for this analysis shows that discrepancies exist within Hispanic students rates of admission and application simply as a function of their proximity to a racially normative group and distance from others like themselves.
 
 ## Appendix
 
@@ -510,44 +532,50 @@ model2 <- sim_many(100, models$Model_52N)
 model3 <- sim_many(100, models$Model_32P)
 model4 <- sim_many(100, models$Model_42P)
 
-ggplot(model1$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
-    geom_line(alpha=.3, linetype=2) + 
-    geom_line(data=model1$gmean, size=2) + 
-    labs(x="Year", y="Rate Admitted to UC (per 1000)")  + 
+ggplot(model1$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) +
+    geom_line(alpha=.3, linetype=2) +
+    geom_line(data=model1$gmean, size=2) +
+    labs(x="Year", y="Rate Admitted to UC (per 1000)")  +
     scale_color_discrete(
-        name="Demography", 
+        name="Demography",
         labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
 ```
 
 ```{R echo=F,fig.cap="Applied Hispanic Student Rate of Acceptance by School Demography"}
-ggplot(model3$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
-    geom_line(alpha=.4, linetype=2) + 
-    geom_line(data=model3$gmean, size=2) + 
-    labs(x="Year", y="Rate Admitted to UC (per 1000)") + 
+ggplot(model3$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) +
+    geom_line(alpha=.4, linetype=2) +
+    geom_line(data=model3$gmean, size=2) +
+    labs(x="Year", y="Rate Admitted to UC (per 1000)") +
     scale_color_discrete(
-        name="Demography", 
+        name="Demography",
         labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
 ```
 
 ```{R echo=F,fig.cap="Hispanic Student Rate of Application by School Demography"}
-ggplot(model2$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
-    geom_line(alpha=.3, linetype=2) + 
-    geom_line(data=model2$gmean, size=2)  + 
-    labs(x="Year", y="Rate Applying to UC (per 1000)") + 
+ggplot(model2$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) +
+    geom_line(alpha=.3, linetype=2) +
+    geom_line(data=model2$gmean, size=2)  +
+    labs(x="Year", y="Rate Applying to UC (per 1000)") +
     scale_color_discrete(
-        name="Demography", 
+        name="Demography",
         labels=c("High White\n(p=.7)", "Low White\n(p=.3)"))
 ```
 
 ```{R echo=F,fig.cap="Hispanic Student Rate of Admission per Application School Demography (Hispanic)"}
-ggplot(model4$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) + 
-    geom_line(alpha=.3, linetype=2) + 
-    geom_line(data=model4$gmean, size=2)  + 
-    labs(x="Year", y="Rate Admitted to UC (per 1000)") + 
+ggplot(model4$sims, aes(x=year, y=pred*1000, group=ID, color=demog)) +
+    geom_line(alpha=.3, linetype=2) +
+    geom_line(data=model4$gmean, size=2)  +
+    labs(x="Year", y="Rate Admitted to UC (per 1000)") +
     scale_color_manual(
-        name="Demography", 
+        name="Demography",
         labels=c("Low Hispanic\n(p=.3)", "High Hispanic\n(p=.7)"),
         values=c("green", "purple"))
 ```
 
-## References
+## References  
+
+Meow Meow 1  
+Meow Meow 2  
+Meow Meow 3  
+Meow Meow 4  
+Meow Meow 5  
