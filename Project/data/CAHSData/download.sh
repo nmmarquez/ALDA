@@ -1,4 +1,4 @@
-#wget http://dq.cde.ca.gov/dataquest/dlfile/dlfile.aspx?cLevel=School&cYear=2015-16&cCat=UCGradEth&cPage=filesgradaf.asp
+
 
 echo "Bash version ${BASH_VERSION}..."
 for i in {1994..2015..1}

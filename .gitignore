@@ -10,3 +10,5 @@
 *.txt
 *.dat
 */Presentation/*
+*.xls
+*.xlsx
