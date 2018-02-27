@@ -118,12 +118,19 @@ extract_cov <- function(model, cov, model_name){
     DF
 }
 
-model_types <- c(
+model_types <- factor(c(
     "Adding MHI and Random Slopes and Intercepts",
     "Adding Random Slopes and Intercepts",
-    "Adding Intercepts",
+    "Adding Random Intercepts",
     "Base Model",
-    "Random Intercepts and No Diversity Index")
+    "Random Intercepts and No Diversity Index"),
+    levels=c(
+        "Base Model",
+        "Random Intercepts and No Diversity Index",
+        "Adding Random Intercepts",
+        "Adding Random Slopes and Intercepts",
+        "Adding MHI and Random Slopes and Intercepts"
+        ))
 
 extractFocusCovs <- function(modelList){
     whiteCOVA <- bind_rows(lapply(1:5, function(i){
@@ -163,11 +170,30 @@ extractFocusCovs <- function(modelList){
     bind_rows(list(diffCovA, diffYCOVA, divCOVA, divYCOVA))
 }
 
-modelACovs <- extractFocusCovs(modelsA)
-modelACovs %>% 
+
+extractFocusCovs(modelsA) %>% 
     ggplot(aes(x=model, y=mean, ymin=lwr, ymax=upr)) + geom_pointrange() + 
     geom_hline(yintercept=1, linetype=2) + 
     facet_wrap(~covariate, scales="free_x") +
     coord_flip() + 
     theme_classic() +
-    theme(axis.line.y = element_blank())
+    theme(axis.line.y = element_blank()) +
+    labs(x="", y="", title="Parameter Estimates For Count Accepted Model")
+
+extractFocusCovs(modelsB) %>% 
+    ggplot(aes(x=model, y=mean, ymin=lwr, ymax=upr)) + geom_pointrange() + 
+    geom_hline(yintercept=1, linetype=2) + 
+    facet_wrap(~covariate, scales="free_x") +
+    coord_flip() + 
+    theme_classic() +
+    theme(axis.line.y = element_blank()) +
+    labs(x="", y="", title="Parameter Estimates For Applied Accepted Model")
+
+extractFocusCovs(modelsC) %>% 
+    ggplot(aes(x=model, y=mean, ymin=lwr, ymax=upr)) + geom_pointrange() + 
+    geom_hline(yintercept=1, linetype=2) + 
+    facet_wrap(~covariate, scales="free_x") +
+    coord_flip() + 
+    theme_classic() +
+    theme(axis.line.y = element_blank()) +
+    labs(x="", y="", title="Parameter Estimates For Count Applied Model")
